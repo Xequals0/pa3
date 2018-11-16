@@ -1,7 +1,5 @@
 #include <stdio.h>
 #include <string.h>
-#include <iostream>
-#include <fstream>
 #include <stdlib.h>
 #include <pthread.h>
 #include <ctype.h>
