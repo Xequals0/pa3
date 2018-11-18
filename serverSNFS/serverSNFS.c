@@ -50,6 +50,103 @@ pthread_mutex_t mutex;
 pthread_cond_t finishedWriting;
 pthread_cond_t finishedReading;
 
+int main()//(int argc, const char* argv[])
+{
+	//char* port = argv[1];
+    int port = 13175; //This is temporary; We should obtain this from the user.
+
+    	int serverSocket, *clientSocket;
+	socklen_t clientlen = sizeof(struct sockaddr_storage);
+	struct sockaddr_storage clientaddr;
+	char client_hostname[8192], client_port[8192];
+    struct sockaddr_in serv_addr;
+	pthread_t tid;
+
+    serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (serverSocket < 0) {
+        printf("Failed to create the server socket. Error: %d\n",errno);
+        exit(1);
+    }
+
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = INADDR_ANY;
+    serv_addr.sin_port=htons(port);
+
+    if(bind(serverSocket, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0)
+    {
+        printf("Failed to bind. Error: %d\n",errno);
+        exit(1);
+    }
+
+    if(listen(serverSocket, 100) < 0) //Arbitrarily chose 100 for the backlog
+    {
+        printf("Listen failed. Error: %d\n",errno);
+        exit(1);
+    }
+
+	client_args *clientinfo = (client_args *)malloc(sizeof(client_args));
+	clientinfo->database = NULL;
+	clientinfo->isEmptyDatabase = 1;
+    do
+    {
+	clientlen = sizeof(struct sockaddr_storage);
+        clientSocket = (int*)malloc(sizeof(int));
+	*clientSocket = accept(serverSocket, (SA *)&clientaddr, &clientlen);
+        if (*clientSocket < 0)
+        {
+            printf("Failed to accept a new connection. Error: %d\n",errno);
+        }/*
+        else
+        {
+            pthread_t tid;
+            pthread_create(&tid, NULL, client_thread_handler, &clientSocket);
+        }*/
+
+	getnameinfo((SA *)&clientaddr, clientlen, client_hostname, 8192, client_port, 8192, 0);
+
+	clientinfo->fd = *clientSocket;
+
+	char hostIP[NI_MAXHOST];
+	int rc = getnameinfo((struct sockaddr *)&clientaddr, clientlen, hostIP, sizeof(hostIP), NULL, 0 , NI_NUMERICHOST | NI_NUMERICSERV);
+
+	if(rc == 0){
+		strcpy(clientinfo->ipAddress, hostIP);
+	}
+	else
+		perror("error getting the clients IP address\n");
+
+	node *newClientNode = (node *) malloc(sizeof(node));
+	newClientNode->client = clientinfo;
+	newClientNode->next = NULL;
+	if(list == NULL)
+		list = newClientNode;
+
+	node *searchList = searchListAddress(clientinfo->ipAddress);
+	if(strcmp(searchList->client->ipAddress, clientinfo->ipAddress) == 0){
+		//already in list
+	}
+	else if(searchList->next == NULL && strcmp(searchList->client->ipAddress, clientinfo->ipAddress) != 0)
+		addClientNode(clientinfo);
+
+	//get what command is being called, ex: open, close, etc
+	int command = -1;
+	if(recv(*clientSocket, &command, sizeof(command), 0) == -1){
+		perror("Could not get the command from the client\n");
+		exit(1);	
+	}
+
+	clientinfo->command = ntohl(command);
+	printf("command is: %d\n", clientinfo->command);
+
+	pthread_create(&tid, NULL, selectMethod, (void*)clientinfo);	
+
+    } while (1);
+
+    close(serverSocket);
+    return 0;
+}
+
+
 void* client_thread_handler(void* clientSock)
 {
     printf("Hey there!\n");
@@ -278,101 +375,6 @@ int server_close(client_args *client){
 }
 
 
-int main()//(int argc, const char* argv[])
-{
-	//char* port = argv[1];
-    int port = 13175; //This is temporary; We should obtain this from the user.
-
-    	int serverSocket, *clientSocket;
-	socklen_t clientlen = sizeof(struct sockaddr_storage);
-	struct sockaddr_storage clientaddr;
-	char client_hostname[8192], client_port[8192];
-    struct sockaddr_in serv_addr;
-	pthread_t tid;
-
-    serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (serverSocket < 0) {
-        printf("Failed to create the server socket. Error: %d\n",errno);
-        exit(1);
-    }
-
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = INADDR_ANY;
-    serv_addr.sin_port=htons(port);
-
-    if(bind(serverSocket, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0)
-    {
-        printf("Failed to bind. Error: %d\n",errno);
-        exit(1);
-    }
-
-    if(listen(serverSocket, 100) < 0) //Arbitrarily chose 100 for the backlog
-    {
-        printf("Listen failed. Error: %d\n",errno);
-        exit(1);
-    }
-
-	client_args *clientinfo = (client_args *)malloc(sizeof(client_args));
-	clientinfo->database = NULL;
-	clientinfo->isEmptyDatabase = 1;
-    do
-    {
-	clientlen = sizeof(struct sockaddr_storage);
-        clientSocket = (int*)malloc(sizeof(int));
-	*clientSocket = accept(serverSocket, (SA *)&clientaddr, &clientlen);
-        if (*clientSocket < 0)
-        {
-            printf("Failed to accept a new connection. Error: %d\n",errno);
-        }/*
-        else
-        {
-            pthread_t tid;
-            pthread_create(&tid, NULL, client_thread_handler, &clientSocket);
-        }*/
-
-	getnameinfo((SA *)&clientaddr, clientlen, client_hostname, 8192, client_port, 8192, 0);
-
-	clientinfo->fd = *clientSocket;
-
-	char hostIP[NI_MAXHOST];
-	int rc = getnameinfo((struct sockaddr *)&clientaddr, clientlen, hostIP, sizeof(hostIP), NULL, 0 , NI_NUMERICHOST | NI_NUMERICSERV);
-
-	if(rc == 0){
-		strcpy(clientinfo->ipAddress, hostIP);
-	}
-	else
-		perror("error getting the clients IP address\n");
-
-	node *newClientNode = (node *) malloc(sizeof(node));
-	newClientNode->client = clientinfo;
-	newClientNode->next = NULL;
-	if(list == NULL)
-		list = newClientNode;
-
-	node *searchList = searchListAddress(clientinfo->ipAddress);
-	if(strcmp(searchList->client->ipAddress, clientinfo->ipAddress) == 0){
-		//already in list
-	}
-	else if(searchList->next == NULL && strcmp(searchList->client->ipAddress, clientinfo->ipAddress) != 0)
-		addClientNode(clientinfo);
-
-	//get what command is being called, ex: open, close, etc
-	int command = -1;
-	if(recv(*clientSocket, &command, sizeof(command), 0) == -1){
-		perror("Could not get the command from the client\n");
-		exit(1);	
-	}
-
-	clientinfo->command = ntohl(command);
-	printf("command is: %d\n", clientinfo->command);
-
-	pthread_create(&tid, NULL, selectMethod, (void*)clientinfo);	
-
-    } while (1);
-
-    close(serverSocket);
-    return 0;
-}
 
 
 void* selectMethod(void *arg){
