@@ -8,10 +8,192 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <string.h>
+#include <unistd.h>
 
+
+int getFlags(char *flags);
+int client_close(int fd);
+int client_open(const char *pathname, int flags);
+int openConnection();
+
+//int clientSocket;
 int main(int argc, const char* argv[])
 {
-    int port = 13175; //This is temporary; We should obtain this from the user.
+	if(argc != 3){
+		printf("Usage %s: <host> <port>\n", argv[0]);
+		return 0;
+	}
+
+	//char* host = argv[1];
+	//char *port = argv[2]; 
+   
+	while(1){
+		printf("Enter one of the following:\n\t\"open <filename>\"\n\t\"close <file descriptor>\"\n\t\"quit\"\n");
+		int i;
+		char input[100];
+		char commands[4][100]; // stores command and its arguements, ex: read, write, etc
+		
+		while(fgets(input, sizeof(input), stdin) == NULL){ ; }
+		
+		//remove newline character
+		char*ch;
+		if((ch=strchr(input, '\n')) != NULL)
+			*ch = '\0';
+
+		char *tok = input, *tmp = input;
+		int first = 1;
+		for(i = 0; i < 4; i++){
+			if(tok == NULL) break;
+			strsep(&tmp, " ");
+
+			if(tok[0] == '\0' && first != 1){
+				i--;
+			}
+			else
+				strcpy(commands[i], tok);
+
+			tok = tmp;
+
+			if(first == 1) first = 0;
+		}
+
+		char *endptr = (char *)calloc(101, sizeof(char));
+		if(strcmp("quit", commands[0]) == 0)
+			break;
+		else if(strcmp("open", commands[0]) == 0){
+			char *path = commands[1];
+			printf("flag is: %s\n", commands[2]);
+			int flags = getFlags(commands[2]);
+			if(client_open(path, flags) == -1){
+				if(errno == 0)
+					herror("Error opening file\n");
+				else
+					perror("Error opening file\n");
+			}	
+		}
+		else if(strcmp("close", commands[0]) == 0){
+			int fd = strtol(commands[1], &endptr, 10);
+			if(client_close(fd) == -1){
+				if(errno == 0)
+					herror("Error opening file\n");
+				else
+					perror("Error opening file\n");
+			}			
+		}
+	}
+
+
+    return 0;
+}
+
+int client_open(const char *pathname, int flags){
+	
+	int connection = openConnection();
+	if(connection < 0){
+		h_errno = HOST_NOT_FOUND;
+		return -1;
+	}
+
+	int command = htonl(0);
+
+	printf("Sending open command to the server\n");
+	if(send(connection, &command, sizeof(command), 0) < 0)
+		printf("Error sending open command to the server\n");
+	sleep(1);
+	
+	//send filename to the server
+	int pathnameLen  = strlen(pathname);
+	int numBytesSent = send(connection, pathname, pathnameLen, 0);
+	if(numBytesSent < 0)
+		printf("Error sending pathname to the server\n");
+	else
+		printf("Success sending pathname(%s) to the server\n", pathname);
+	sleep(1);
+
+	//send flags to server
+	int flagMessage = htonl(flags);
+	if(send(connection, &flagMessage, sizeof(flagMessage), 0) < 0)
+		printf("Error sending flags to the server\n");
+	else
+		printf("Success sending flags(%d) to the server\n", flags);
+	
+	printf("Waiting for response from server\n");
+	int output_fd;
+	if(recv(connection, &output_fd, sizeof(output_fd), 0) == -1){
+		perror("Error receiving fd from the server\n");
+		return -1;		
+	}
+
+	printf("fd recveived was %d\n", output_fd);
+
+	//receive any errors
+	int errorMessage;
+	if(output_fd == -1){
+		if(recv(connection, &errorMessage, sizeof(errorMessage), 0) == -1){
+			perror("Could not recieve error message from the server\n");
+			return -1;
+		}
+		errno = ntohl(errorMessage);
+		perror("Error from the server\n");
+	}
+	printf("\n");
+	close(connection);
+	return output_fd;	
+}
+
+int client_close(int fd){
+
+	int connection = openConnection();
+	if(connection < 0){
+		h_errno = HOST_NOT_FOUND;
+		return -1;
+	}
+
+	int nClose = htonl(3);
+	if(send(connection, &nClose, sizeof(nClose), 0) == -1){
+		perror("Could not send close command to server\n");
+	}
+
+	sleep(1);
+
+	int msg = htonl(fd);
+	if(send(connection, &msg, sizeof(msg), 0) == -1)
+		perror("Fd could not be sent to the server\n");
+
+	int retVal;
+	if(recv(connection, &retVal, sizeof(retVal), 0) == -1)
+		perror("Return value from the server was not received\n");
+
+	int result = ntohl(retVal);
+	
+	if(result == -1){
+		int error;
+		if(recv(connection, &error, sizeof(error), 0) == -1)
+			perror("Could not get error code from the server\n");
+
+		errno = ntohl(error);
+		perror("Error when trying to close fd\n");
+	}
+	printf("\n");
+	close(connection);
+
+	return result;
+}
+
+int getFlags(char *flags){
+	if(strcmp(flags, "r") == 0)
+		return 0;
+	else if(strcmp(flags, "w") == 0)
+		return 1;
+	else if(strcmp(flags, "rw") == 0)
+		return 2;
+	else 
+		return -1;
+}
+
+
+int openConnection(){
+ int port = 13175;
     
     int clientSocket;
     struct sockaddr_in serv_addr;
@@ -22,7 +204,7 @@ int main(int argc, const char* argv[])
         printf("Failed to create the client socket. Error: %d\n",errno);
         exit(1);
     }
-    
+
     serv_addr.sin_family = AF_INET;
     server = gethostbyname("localhost"); //Update this later
     if (server == 0) { //Not sure if I did this right?
@@ -31,25 +213,67 @@ int main(int argc, const char* argv[])
     }
     memcpy(&serv_addr.sin_addr, server->h_addr, server->h_length);
     serv_addr.sin_port=htons(port);
-    
+      
     if(connect(clientSocket, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0)
     {
         printf("Failed to bind. Error: %d\n",errno);
         close(clientSocket);
         exit(1);
     }
-    
-    char buffer[256];
-    int receive;
-    receive = recv(clientSocket, buffer, sizeof(buffer), 0);
-    if (receive < 0) {
-        printf("Failed to receive from the server. Error: %d\n",errno);
-        exit(1);
-    } else {
-        printf("%s", buffer);
-    }
-    
-    //Continue with the client protocol here (call additional functions, etc.):
-    close(clientSocket);
-    return 0;
+	return clientSocket;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
