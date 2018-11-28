@@ -1,3 +1,6 @@
+#define FUSE_USE_VERSION 29
+
+#include <fuse.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/socket.h>
@@ -223,7 +226,19 @@ int openConnection(){
 	return clientSocket;
 }
 
-
+static struct fuse_operations snfs_oper = {
+	.create = snfs_create,
+	.open = snfs_open,
+	.close = snfs_open,
+	.truncate = snfs_truncate,
+	.getattr = snfs_getattr,
+	.read = snfs_read,
+	.write = snfs_write,
+	.opendir = snfs_opendir,
+	.readdir = snfs_readdir,
+	.releasedir = snfs_releasedir,
+	.mkdir = snfs_mkdir
+};
 
 
 
