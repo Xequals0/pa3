@@ -388,6 +388,88 @@ int server_close(client_args *client){
 	return closed;
 }
 
+int server_mkdir(client_args *client){
+    
+    //recv path
+    char pathBuffer[256];
+    bzero(&pathBuffer, sizeof(pathBuffer));
+    char *path = (char *)malloc(sizeof(char));
+    
+    int recv_path;
+    if((recv_path = recv(client->fd, filenameBuffer, sizeof(filenameBuffer), 0)) == -1)
+        perror("Error reading path from the client\n");
+    
+    path[recv_path] = '\0';
+    strcpy(path, pathBuffer);
+    
+    //recv mode
+    int modeN;
+    bzero(&modeN, sizeof(modeN));
+    
+    if(recv(client->fd, &modeN, sizeof(modeN), 0) < 0)
+        printf("Error reading mode from the client\n");
+    
+    int mode = ntohl(modeN);
+    
+    int result;
+    
+    result = mkdir(path, mode);
+    
+    int mkdirResult = htonl(result);
+    
+    //send result from mkdir call
+    if(send(client->fd, &mkdirResult, sizeof(mkdirResult) , 0) == -1)
+        perror("Could not send the mkdir return value to the client\n");
+    
+    //send errno if there is an error
+    if(result == -1){
+        int error = htonl(errno);
+        if(send(client->fd, &error, sizeof(error), 0) == -1)
+            perror("Could not send errno to the client");
+    }
+    
+    return result;
+}
+
+int snfs_getattr(const char *path, struct stat *stbuf){
+    //recv path
+    char pathBuffer[256];
+    bzero(&pathBuffer, sizeof(pathBuffer));
+    char *path = (char *)malloc(sizeof(char));
+    
+    int recv_path;
+    if((recv_path = recv(client->fd, filenameBuffer, sizeof(filenameBuffer), 0)) == -1)
+        perror("Error reading path from the client\n");
+    
+    path[recv_path] = '\0';
+    strcpy(path, pathBuffer);
+    
+    //recv stbuf
+    
+    
+    
+    
+    
+    
+    
+    int result = lstat(path, stbuf);
+    
+    int res = htonl(result);
+    
+    //send result from lstat call
+    if(send(client->fd, &res, sizeof(res) , 0) == -1)
+        perror("Could not send the getattr return value to the client\n");
+    
+    //send errno if there is an error
+    if(result == -1){
+        int error = htonl(errno);
+        if(send(client->fd, &error, sizeof(error), 0) == -1)
+            perror("Could not send errno to the client");
+    }
+    
+    return result;
+
+}
 
 
 
@@ -424,7 +506,8 @@ void* selectMethod(void *arg){
         
     }
     else if(command == 10){ //mkdir
-    
+        printf("calling server_mkdir");
+        server_mkdir(args);
     }
 	else{
 		printf("No valid method was called\n");	
