@@ -21,8 +21,22 @@ typedef struct File{
 
 typedef struct{
 	char ipAddress[INET_ADDRSTRLEN];
-	int command; //0 for open, 1 for read, 2 for write, 3 for close
-	int fd;
+	int command;
+	/*
+     Corresponding command values: 
+     0. open
+     1. read
+     2. write
+     3. close
+     4. create
+     5. truncate
+     6. getattr
+     7. opendir
+     8. readdir
+     9. releasedir
+     10. mkdir
+     */
+    int fd;
 	fileNode *database;
 	int isEmptyDatabase;
 } client_args;
