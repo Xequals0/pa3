@@ -193,7 +193,60 @@ int snfs_truncate(const char *path, uid_t uid, gid_t gid){
 }
 
 int snfs_getattr(const char *path, struct stat *stbuf){
-
+    int connection = openConnection();
+    
+    if(connection < 0){
+        h_errno = HOST_NOT_FOUND;
+        return -1;
+    }
+    
+    int command = htonl(6);
+    
+    printf("Sending open command to the server\n");
+    if(send(connection, &command, sizeof(command), 0) < 0)
+        printf("Error sending open command to the server\n");
+    
+    sleep(1);
+    
+    //send path to the server
+    int pathLen  = strlen(path)
+    int pathLength = htonl(pathLen);
+    
+    int numBytesSent = send(connection, path, pathLength, 0);
+    if(numBytesSent < 0)
+        printf("Error sending path to the server\n");
+    else
+        printf("Success sending path(%s) to the server\n", path);
+    
+    sleep(1);
+    
+    //send stbuf to server
+    
+    
+ 
+    
+    
+    //recv return value
+    int retVal;
+    if(recv(connection, &retVal, sizeof(retVal), 0) == -1)
+        perror("Return value from the server was not received\n");
+    
+    int result = ntohl(retVal);
+    
+    //receive any errors
+    int errorMessage;
+    if(result == -1){
+        if(recv(connection, &errorMessage, sizeof(errorMessage), 0) == -1){
+            perror("Could not recieve error message from the server\n");
+            return -1;
+        }
+        errno = ntohl(errorMessage);
+        perror("Error from the server\n");
+    }
+    printf("\n");
+    close(connection);
+    
+    return result;
 }
 
 int getFlags(char *flags){
@@ -220,7 +273,7 @@ int snfs_opendir(const char *path, struct fuse_file_info *fi){
 }
 
 int snfs_readdir(const char* path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi){
-
+    
 }
 
 int releasedir(const char *path, struct fuse_file_info *fi){
@@ -228,7 +281,65 @@ int releasedir(const char *path, struct fuse_file_info *fi){
 }
 
 int snfs_mkdir(const char *path, mode_t mode){
-
+    int connection = openConnection();
+    
+    if(connection < 0){
+        h_errno = HOST_NOT_FOUND;
+        return -1;
+    }
+    
+    int command = htonl(10);
+    
+    printf("Sending open command to the server\n");
+    if(send(connection, &command, sizeof(command), 0) < 0)
+        printf("Error sending open command to the server\n");
+    
+    sleep(1);
+    
+    //send path to the server
+    int pathLen  = strlen(path)
+    int pathLength = htonl(pathLen);
+    
+    int numBytesSent = send(connection, path, pathLength, 0);
+    if(numBytesSent < 0)
+        printf("Error sending path to the server\n");
+    else
+        printf("Success sending path(%s) to the server\n", path);
+    
+    sleep(1);
+    
+    //send mode to server
+    int modeN = htonl(mode);
+    
+    int numBytesSent = send(connection, &modeN, sizeof(modeN), 0);
+    if(numBytesSent < 0)
+        printf("Error sending path to the server\n");
+    else
+        printf("Success sending path(%s) to the server\n", path);
+    
+    sleep(1);
+    
+    //recv return value
+    int retVal;
+    if(recv(connection, &retVal, sizeof(retVal), 0) == -1)
+        perror("Return value from the server was not received\n");
+    
+    int result = ntohl(retVal);
+    
+    //receive any errors
+    int errorMessage;
+    if(result == -1){
+        if(recv(connection, &errorMessage, sizeof(errorMessage), 0) == -1){
+            perror("Could not recieve error message from the server\n");
+            return -1;
+        }
+        errno = ntohl(errorMessage);
+        perror("Error from the server\n");
+    }
+    printf("\n");
+    close(connection);
+    
+    return result;
 }
 
 int openConnection(){
