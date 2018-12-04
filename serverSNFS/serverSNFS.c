@@ -23,7 +23,7 @@ typedef struct{
 	char ipAddress[INET_ADDRSTRLEN];
 	int command;
 	/*
-     Corresponding command values: 
+     Corresponding command values:
      0. open
      1. read
      2. write
@@ -405,7 +405,27 @@ void* selectMethod(void *arg){
 		printf("calling server_close");
 		server_close(args);
 	}
-	//add the other methods we need to implement in here
+    else if(command == 4){ //create
+        
+    }
+    else if(command == 5){ //truncate
+        
+    }
+    else if(command == 6){ //getattr
+        
+    }
+    else if(command == 7){ //opendir
+        
+    }
+    else if(command == 8){ //readdir
+        
+    }
+    else if(command == 9){ //releasedir
+        
+    }
+    else if(command == 10){ //mkdir
+    
+    }
 	else{
 		printf("No valid method was called\n");	
 	}
