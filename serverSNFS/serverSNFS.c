@@ -396,7 +396,7 @@ int server_mkdir(client_args *client){
     char *path = (char *)malloc(sizeof(char));
     
     int recv_path;
-    if((recv_path = recv(client->fd, filenameBuffer, sizeof(filenameBuffer), 0)) == -1)
+    if((recv_path = recv(client->fd, pathBuffer, sizeof(pathBuffer), 0)) == -1)
         perror("Error reading path from the client\n");
     
     path[recv_path] = '\0';
@@ -431,14 +431,14 @@ int server_mkdir(client_args *client){
     return result;
 }
 
-int snfs_getattr(const char *path, struct stat *stbuf){
+int snfs_getattr(client_args *client){
     //recv path
     char pathBuffer[256];
     bzero(&pathBuffer, sizeof(pathBuffer));
     char *path = (char *)malloc(sizeof(char));
     
     int recv_path;
-    if((recv_path = recv(client->fd, filenameBuffer, sizeof(filenameBuffer), 0)) == -1)
+    if((recv_path = recv(client->fd, pathBuffer, sizeof(pathBuffer), 0)) == -1)
         perror("Error reading path from the client\n");
     
     path[recv_path] = '\0';
