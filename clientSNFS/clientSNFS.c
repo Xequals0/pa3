@@ -1,4 +1,9 @@
 #define FUSE_USE_VERSION 29
+#define _FILE_OFFSET_BITS 64
+
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 #include <fuse.h>
 #include <stdlib.h>
@@ -15,8 +20,8 @@
 
 
 int getFlags(char *flags);
-int client_close(int fd);
-int client_open(const char *pathname, int flags);
+int snfs_close(int fd);
+int snfs_open(const char *pathname, int flags);
 int openConnection();
 
 //int clientSocket;
@@ -67,7 +72,7 @@ int main(int argc, const char* argv[])
 			char *path = commands[1];
 			printf("flag is: %s\n", commands[2]);
 			int flags = getFlags(commands[2]);
-			if(client_open(path, flags) == -1){
+			if(snfs_open(path, flags) == -1){
 				if(errno == 0)
 					herror("Error opening file\n");
 				else
@@ -76,7 +81,7 @@ int main(int argc, const char* argv[])
 		}
 		else if(strcmp("close", commands[0]) == 0){
 			int fd = strtol(commands[1], &endptr, 10);
-			if(client_close(fd) == -1){
+			if(snfs_close(fd) == -1){
 				if(errno == 0)
 					herror("Error opening file\n");
 				else
@@ -89,8 +94,8 @@ int main(int argc, const char* argv[])
     return 0;
 }
 
-int client_open(const char *pathname, int flags){
-	
+int snfs_open(const char *pathname, int flags){
+		
 	int connection = openConnection();
 	if(connection < 0){
 		h_errno = HOST_NOT_FOUND;
@@ -144,7 +149,7 @@ int client_open(const char *pathname, int flags){
 	return output_fd;	
 }
 
-int client_close(int fd){
+int snfs_close(int fd){
 
 	int connection = openConnection();
 	if(connection < 0){
@@ -183,6 +188,14 @@ int client_close(int fd){
 	return result;
 }
 
+int snfs_truncate(const char *path, uid_t uid, gid_t gid){
+
+}
+
+int snfs_getattr(const char *path, struct stat *stbuf){
+
+}
+
 int getFlags(char *flags){
 	if(strcmp(flags, "r") == 0)
 		return 0;
@@ -194,6 +207,29 @@ int getFlags(char *flags){
 		return -1;
 }
 
+int snfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi){
+
+}
+
+int snfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi){
+
+}
+
+int snfs_opendir(const char *path, struct fuse_file_info *fi){
+
+}
+
+int snfs_readdir(const char* path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi){
+
+}
+
+int releasedir(const char *path, struct fuse_file_info *fi){
+
+}
+
+int snfs_mkdir(const char *path, mode_t mode){
+
+}
 
 int openConnection(){
  int port = 13175;
@@ -227,9 +263,9 @@ int openConnection(){
 }
 
 static struct fuse_operations snfs_oper = {
-	.create = snfs_create,
 	.open = snfs_open,
-	.close = snfs_open,
+	//.close = snfs_close
+	/*.create = snfs_create,
 	.truncate = snfs_truncate,
 	.getattr = snfs_getattr,
 	.read = snfs_read,
@@ -237,58 +273,5 @@ static struct fuse_operations snfs_oper = {
 	.opendir = snfs_opendir,
 	.readdir = snfs_readdir,
 	.releasedir = snfs_releasedir,
-	.mkdir = snfs_mkdir
+	.mkdir = snfs_mkdir */
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
