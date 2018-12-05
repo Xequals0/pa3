@@ -331,7 +331,7 @@ int server_open(client_args *client){
 	return fd;
 }
 
-int server_write(client_args *client){
+int server_read(client_args *client){
     
     //recv path
     char pathBuffer[256];
