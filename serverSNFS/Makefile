@@ -1,4 +1,4 @@
-FLAGS = -W -Wall -pedantic -g -pthread
+FLAGS = -W -Wall -g -pthread
 CC = gcc
 
 all: serverSNFS
