@@ -331,6 +331,105 @@ int server_open(client_args *client){
 	return fd;
 }
 
+int server_read(client_args *client){
+    
+}
+
+int server_write(client_args *client){
+    
+    //recv path
+    char pathBuffer[256];
+    bzero(&pathBuffer, sizeof(pathBuffer));
+    char *path = (char *)malloc(sizeof(char));
+    
+    int recv_path;
+    if((recv_path = recv(client->fd, pathBuffer, sizeof(pathBuffer), 0)) == -1)
+        perror("Error reading path from the client\n");
+    
+    path[recv_path] = '\0';
+    strcpy(path, pathBuffer);
+    
+    //recv buf
+    char bufBuffer[256];
+    bzero(&bufBuffer, sizeof(bufBuffer));
+    char *buf = (char *)malloc(sizeof(char));
+    
+    int recv_buf;
+    if((recv_buf = recv(client->fd, bufBuffer, sizeof(bufBuffer), 0)) == -1)
+        perror("Error reading buf from the client\n");
+    
+    path[recv_buf] = '\0';
+    strcpy(buf, bufBuffer);
+    
+    //recv size
+    int sizeN;
+    bzero(&sizeN, sizeof(sizeN));
+    
+    if(recv(client->fd, &sizeN, sizeof(sizeN), 0) < 0)
+        printf("Error reading size from the client\n");
+    
+    int size = ntohl(sizeN);
+    
+    //recv offset
+    int offsetN;
+    bzero(&offsetN, sizeof(offsetN));
+    
+    if(recv(client->fd, &offsetN, sizeof(offsetN), 0) < 0)
+        printf("Error reading offset from the client\n");
+    
+    int offset = ntohl(offsetN);
+    
+    
+    int fd = open(path, O_WRONLY);
+    if (fd == -1){
+        
+        int retVal = htonl(-1);
+        
+        //lets client know that an error has occured
+        if(send(client->fd, &retVal, sizeof(retVal), 0) == -1)
+            perror("Could not send -1 to the client\n");
+        
+        //send errno
+        if(result == -1){
+            int error = htonl(errno);
+            if(send(client->fd, &error, sizeof(error), 0) == -1)
+                perror("Could not send errno to the client");
+        }
+        
+        return errno;
+    }
+
+    int res = pwrite(fd, buf, size, offset);
+    if (res == -1){
+        int retVal = htonl(-1);
+        
+        //lets client know that an error has occured
+        if(send(client->fd, &retVal, sizeof(retVal), 0) == -1)
+            perror("Could not send -1 to the client\n");
+        
+        //send errno
+        if(result == -1){
+            int error = htonl(errno);
+            if(send(client->fd, &error, sizeof(error), 0) == -1)
+                perror("Could not send errno to the client");
+        }
+        
+        close(fd);
+        
+        return errno;
+    }
+    
+    int result = htonl(res);
+    
+    //send result from pwrite call
+    if(send(client->fd, &result, sizeof(result) , 0) == -1)
+        perror("Could not send the write return value to the client\n");
+    
+    close(fd);
+    
+    return res;
+}
+
 int server_close(client_args *client){
 	int fds = -1;
 
