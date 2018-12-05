@@ -330,11 +330,11 @@ int server_open(client_args *client){
 
 	return fd;
 }
-
+/*
 int server_read(client_args *client){
     
 }
-
+*/
 int server_write(client_args *client){
     
     //recv path
@@ -390,11 +390,10 @@ int server_write(client_args *client){
             perror("Could not send -1 to the client\n");
         
         //send errno
-        if(result == -1){
-            int error = htonl(errno);
-            if(send(client->fd, &error, sizeof(error), 0) == -1)
-                perror("Could not send errno to the client");
-        }
+        int error = htonl(errno);
+        if(send(client->fd, &error, sizeof(error), 0) == -1)
+            perror("Could not send errno to the client");
+        
         
         return errno;
     }
@@ -408,11 +407,10 @@ int server_write(client_args *client){
             perror("Could not send -1 to the client\n");
         
         //send errno
-        if(result == -1){
-            int error = htonl(errno);
-            if(send(client->fd, &error, sizeof(error), 0) == -1)
-                perror("Could not send errno to the client");
-        }
+        int error = htonl(errno);
+        if(send(client->fd, &error, sizeof(error), 0) == -1)
+            perror("Could not send errno to the client");
+        
         
         close(fd);
         
