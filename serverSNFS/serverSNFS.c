@@ -580,8 +580,13 @@ void* selectMethod(void *arg){
 		printf("calling server_open\n");
 		server_open(args);
 	}
-	else if(command == 1){} //read
-	else if(command == 2){}	//write
+	else if(command == 1){ //read
+        
+    }
+	else if(command == 2){ //write
+        printf("calling server_write");
+        server_close(args);
+    }
 	else if(command == 3){
 		printf("calling server_close");
 		server_close(args);
