@@ -94,7 +94,7 @@ int main(int argc, const char* argv[])
     return 0;
 }
 
-int snfs_open(const char *pathname, int flags){
+int snfs_open(const char *pathname, struct fuse_file_info *fi){
 		
 	int connection = openConnection();
 	if(connection < 0){
@@ -109,23 +109,28 @@ int snfs_open(const char *pathname, int flags){
 		printf("Error sending open command to the server\n");
 	sleep(1);
 	
-	//send filename to the server
-	int pathnameLen  = strlen(pathname);
-	int numBytesSent = send(connection, pathname, pathnameLen, 0);
-	if(numBytesSent < 0)
-		printf("Error sending pathname to the server\n");
-	else
-		printf("Success sending pathname(%s) to the server\n", pathname);
-	sleep(1);
+	//send path to the server
+    int pathLen  = strlen(path)
+    int pathLength = htonl(pathLen);
+    
+    int numBytesSent = send(connection, path, pathLength, 0);
+    if(numBytesSent < 0)
+        printf("Error sending path to the server\n");
+    else
+        printf("Success sending path(%s) to the server\n", path);
+    
+    sleep(1);
 
 	//send flags to server
-	int flagMessage = htonl(flags);
+	int flagMessage = htonl(fi->flags);
 	if(send(connection, &flagMessage, sizeof(flagMessage), 0) < 0)
 		printf("Error sending flags to the server\n");
 	else
 		printf("Success sending flags(%d) to the server\n", flags);
 	
 	printf("Waiting for response from server\n");
+    
+    //recv fd
 	int output_fd;
 	if(recv(connection, &output_fd, sizeof(output_fd), 0) == -1){
 		perror("Error receiving fd from the server\n");
@@ -146,6 +151,7 @@ int snfs_open(const char *pathname, int flags){
 	}
 	printf("\n");
 	close(connection);
+    
 	return output_fd;	
 }
 
