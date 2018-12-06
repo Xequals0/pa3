@@ -37,8 +37,8 @@ typedef struct{
      10. mkdir
      */
     int fd;
-	fileNode *database;
-	int isEmptyDatabase;
+//	fileNode *database;
+//	int isEmptyDatabase;
 } client_args;
 
 /*typedef struct Node{
@@ -49,21 +49,23 @@ typedef struct{
 
 typedef struct sockaddr SA;
 
-fileNode* searchDataBaseFileName(client_args *client, char *filename);
-fileNode* searchDataBaseFD(client_args *client, int fd);
-int removeFileNode(client_args *client, int fd);
+//fileNode* searchDataBaseFileName(client_args *client, char *filename);
+//fileNode* searchDataBaseFD(client_args *client, int fd);
+//int removeFileNode(client_args *client, int fd);
 void* selectMethod(void *arg);
-node* searchListAddress(char *ipAddress);
-int addClientNode(client_args *client);
+//node* searchListAddress(char *ipAddress);
+//int addClientNode(client_args *client);
 
 
-node* list = NULL;
+//node* list = NULL;
 
+/*
 int numReaders;
 int isWriting;
 pthread_mutex_t mutex;
 pthread_cond_t finishedWriting;
 pthread_cond_t finishedReading;
+*/
 
 int main()//(int argc, const char* argv[])
 {
@@ -100,8 +102,8 @@ int main()//(int argc, const char* argv[])
     }
 
 	client_args *clientinfo = (client_args *)malloc(sizeof(client_args));
-	clientinfo->database = NULL;
-	clientinfo->isEmptyDatabase = 1;
+	//clientinfo->database = NULL;
+	//clientinfo->isEmptyDatabase = 1;
     do
     {
 	clientlen = sizeof(struct sockaddr_storage);
@@ -130,7 +132,7 @@ int main()//(int argc, const char* argv[])
 	else
 		perror("error getting the clients IP address\n");
 
-	node *newClientNode = (node *) malloc(sizeof(node));
+/*	node *newClientNode = (node *) malloc(sizeof(node));
 	newClientNode->client = clientinfo;
 	newClientNode->next = NULL;
 	if(list == NULL)
@@ -142,6 +144,7 @@ int main()//(int argc, const char* argv[])
 	}
 	else if(searchList->next == NULL && strcmp(searchList->client->ipAddress, clientinfo->ipAddress) != 0)
 		addClientNode(clientinfo);
+*/
 
 	//get what command is being called, ex: open, close, etc
 	int command = -1;
@@ -175,17 +178,17 @@ void* client_thread_handler(void* clientSock)
     pthread_exit(0);
 }
 
-
+/*
 int removeFileNode(client_args *client, int fd){
 	if(client->database == NULL || client->isEmptyDatabase == 1)
 		return -1;
 
 	//not sure if we need this
-	/*if(client->database->next == NULL){
+	if(client->database->next == NULL){
 		client->database = NULL;
 		client->isEmptyDatabase = 1;
 		return 0;
-	} */
+	} 
 
 	fileNode *temp = client->database, *prev;
 	if(temp->fd == fd){
@@ -247,7 +250,7 @@ fileNode* searchDataBaseFileName(client_args *client, char *filename){
 
 	return prv;
 }
-
+*/
 
 int server_open(client_args *client){
 	char filenameBuffer[255];
@@ -620,7 +623,7 @@ int server_mkdir(client_args *client){
     return result;
 }
 
-int snfs_getattr(client_args *client){
+int server_getattr(client_args *client){
     //recv path
     char pathBuffer[256];
     bzero(&pathBuffer, sizeof(pathBuffer));
@@ -676,12 +679,12 @@ void* selectMethod(void *arg){
     }
 	else if(command == 2){ //write
         printf("calling server_write");
-        server_close(args);
+        server_write(args);
     }
-	else if(command == 3){
+	/*else if(command == 3){
 		printf("calling server_close");
 		server_close(args);
-	}
+	}*/
     else if(command == 4){ //create
         
     }
@@ -689,7 +692,8 @@ void* selectMethod(void *arg){
         
     }
     else if(command == 6){ //getattr
-        
+        printf("calling server_getattr");
+        server_getattr(args);
     }
     else if(command == 7){ //opendir
         
@@ -709,7 +713,7 @@ void* selectMethod(void *arg){
 	}
 	return NULL;	
 }
-
+/*
 node* searchListAddress(char *ipAddress){
 	node *ptr = list;
 	node *prv = NULL;
@@ -743,7 +747,7 @@ int addClientNode(client_args *client){
 	else
 		return -1;
 }
-
+*/
 
 
 
