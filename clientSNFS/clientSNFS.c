@@ -21,7 +21,6 @@
 
 int getFlags(char *flags);
 int snfs_close(int fd);
-int snfs_open(const char *pathname, int flags);
 int openConnection();
 
 //int clientSocket;
@@ -68,7 +67,7 @@ int main(int argc, const char* argv[])
 		char *endptr = (char *)calloc(101, sizeof(char));
 		if(strcmp("quit", commands[0]) == 0)
 			break;
-		else if(strcmp("open", commands[0]) == 0){
+		/*else if(strcmp("open", commands[0]) == 0){
 			char *path = commands[1];
 			printf("flag is: %s\n", commands[2]);
 			int flags = getFlags(commands[2]);
@@ -78,7 +77,7 @@ int main(int argc, const char* argv[])
 				else
 					perror("Error opening file\n");
 			}	
-		}
+		}*/
 		else if(strcmp("close", commands[0]) == 0){
 			int fd = strtol(commands[1], &endptr, 10);
 			if(snfs_close(fd) == -1){
@@ -94,7 +93,7 @@ int main(int argc, const char* argv[])
     return 0;
 }
 
-int snfs_open(const char *pathname, struct fuse_file_info *fi){
+int snfs_open(const char *path, struct fuse_file_info *fi){
 		
 	int connection = openConnection();
 	if(connection < 0){
@@ -110,7 +109,7 @@ int snfs_open(const char *pathname, struct fuse_file_info *fi){
 	sleep(1);
 	
 	//send path to the server
-    int pathLen  = strlen(path)
+    int pathLen  = strlen(path);
     int pathLength = htonl(pathLen);
     
     int numBytesSent = send(connection, path, pathLength, 0);
@@ -126,7 +125,7 @@ int snfs_open(const char *pathname, struct fuse_file_info *fi){
 	if(send(connection, &flagMessage, sizeof(flagMessage), 0) < 0)
 		printf("Error sending flags to the server\n");
 	else
-		printf("Success sending flags(%d) to the server\n", flags);
+		printf("Success sending flags(%d) to the server\n", fi->flags);
 	
 	printf("Waiting for response from server\n");
     
