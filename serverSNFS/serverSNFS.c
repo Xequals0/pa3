@@ -257,15 +257,15 @@ int server_open(client_args *client){
 	if((recv_file = recv(client->fd, filenameBuffer, sizeof(filenameBuffer), 0)) == -1)
 		perror("Error reading filename from the client\n");
 
-	fileNode* searchDatabase;
+	/*fileNode* searchDatabase;
 	fileNode* newFile = (fileNode *) malloc(sizeof(fileNode));
 	int isLast = 0;
-	int fileExists = 0;
+	int fileExists = 0;*/
 
 	filename[recv_file] = '\0';
 	strcpy(filename, filenameBuffer);
 
- 	searchDatabase = searchDataBaseFileName(client, filename);
+ 	/*searchDatabase = searchDataBaseFileName(client, filename);
 
 	newFile->pathname = filename;
 	
@@ -278,7 +278,7 @@ int server_open(client_args *client){
 			isLast = 1;
 		}
 	}
-
+     */
 	int tmpFlag;
 	bzero(&tmpFlag, sizeof(tmpFlag));
 
@@ -288,22 +288,18 @@ int server_open(client_args *client){
 	int flag = ntohl(tmpFlag);
 	printf("flag: %d\n", flag);
 
-	if(isLast == 1)
+/*	if(isLast == 1)
 		newFile->flags = flag;
+*/
 
-	int fd;
-	if(fileExists == 0){  //if file is not in the database, try to open it		
-		if(flag == 0)
-			fd = open(filename, O_RDONLY);
-		else if(flag == 1)
-			fd = open(filename, O_WRONLY);
-		else if(flag == 2)
-			fd = open(filename, O_RDWR);
-		else
-			fd = -1;
-	}
-	else //if file already exists in database, send the existing fd
-		fd = searchDatabase->fd;
+/*    if(flag == 0)
+        fd = open(filename, O_RDONLY);
+    else if(flag == 1)
+        fd = open(filename, O_WRONLY);
+    else if(flag == 2)
+        fd = open(filename, O_RDWR);
+    else
+        fd = -1;
 
 	printf("fd: %d\n", fd);
 
@@ -317,12 +313,16 @@ int server_open(client_args *client){
 		if(isLast == 1)
 			searchDatabase->next = newFile;
 	}
-
+    */
+    
+    int fd = open(filename, flags);
+    
 	if(send(client->fd, &fd, sizeof(fd), 0) == -1)
 		perror("Error sending fd to the client");
 
-	int error = htonl(errno);
+
 	if(fd == -1){
+            int error = htonl(errno);
 		if(send(client->fd, &error, sizeof(error), 0) == -1){
 			printf("Error sending errno to the client");
 		}
