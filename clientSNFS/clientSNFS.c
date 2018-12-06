@@ -20,7 +20,7 @@
 
 
 int getFlags(char *flags);
-int snfs_close(int fd);
+//int snfs_close(int fd);
 int openConnection();
 
 //int clientSocket;
@@ -78,7 +78,7 @@ int main(int argc, const char* argv[])
 					perror("Error opening file\n");
 			}	
 		}*/
-		else if(strcmp("close", commands[0]) == 0){
+		/*else if(strcmp("close", commands[0]) == 0){
 			int fd = strtol(commands[1], &endptr, 10);
 			if(snfs_close(fd) == -1){
 				if(errno == 0)
@@ -86,7 +86,7 @@ int main(int argc, const char* argv[])
 				else
 					perror("Error opening file\n");
 			}			
-		}
+		} */
 	}
 
 
@@ -153,7 +153,7 @@ int snfs_open(const char *path, struct fuse_file_info *fi){
     
 	return output_fd;	
 }
-
+/*
 int snfs_close(int fd){
 
 	int connection = openConnection();
@@ -191,7 +191,8 @@ int snfs_close(int fd){
 	close(connection);
 
 	return result;
-}
+}*/
+
 /*
 int snfs_truncate(const char *path, uid_t uid, gid_t gid){
 

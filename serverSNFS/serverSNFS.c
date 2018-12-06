@@ -12,13 +12,13 @@
 #include <unistd.h>
 #include <netdb.h>
 
-typedef struct File{
+/* typedef struct File{
 	char *pathname;
 	int fd;
 	int flags;
 	struct File *next;
 } fileNode;
-
+*/ 
 typedef struct{
 	char ipAddress[INET_ADDRSTRLEN];
 	int command;
@@ -41,10 +41,11 @@ typedef struct{
 	int isEmptyDatabase;
 } client_args;
 
-typedef struct Node{
+/*typedef struct Node{
 	client_args *client;
 	struct Node *next;
 } node;
+*/
 
 typedef struct sockaddr SA;
 
@@ -518,7 +519,7 @@ int server_write(client_args *client){
     
     return res;
 }
-
+/*
 int server_close(client_args *client){
 	int fds = -1;
 
@@ -574,7 +575,7 @@ int server_close(client_args *client){
 	}
 
 	return closed;
-}
+}*/
 
 int server_mkdir(client_args *client){
     
