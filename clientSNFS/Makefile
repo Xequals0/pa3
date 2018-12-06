@@ -1,4 +1,4 @@
-FLAGS = -W -Wall -pedantic -g
+FLAGS = -W -Wall -g
 CC = gcc
 
 all: clientSNFS
