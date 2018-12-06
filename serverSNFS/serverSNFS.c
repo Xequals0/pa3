@@ -315,7 +315,7 @@ int server_open(client_args *client){
 	}
     */
     
-    int fd = open(filename, flags);
+    int fd = open(filename, flag);
     
 	if(send(client->fd, &fd, sizeof(fd), 0) == -1)
 		perror("Error sending fd to the client");
