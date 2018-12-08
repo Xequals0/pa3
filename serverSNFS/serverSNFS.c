@@ -642,7 +642,7 @@ int server_getattr(client_args *client){
     char *serializedStbuf = (char *)malloc(sizeof(char));
     
     int recv_stbuf;
-    if((recv_path = recv(client->fd, stbufBuffer, sizeof(stbufBuffer), 0)) == -1)
+    if((recv_stbuf = recv(client->fd, stbufBuffer, sizeof(stbufBuffer), 0)) == -1)
         perror("Error reading stbuf from the client\n");
     
     path[recv_stbuf] = '\0';
@@ -652,7 +652,7 @@ int server_getattr(client_args *client){
     char *ino_tVal = dev_tVal1 + sizeof(dev_tVal1);
     char *mode_tVal = ino_tVal + sizeof(ino_t);
     char *nlinkVal = mode_tVal + sizeof(mode_t);
-    char *uid_tVal = nlinkVal + sizeof(nlink);
+    char *uid_tVal = nlinkVal + sizeof(nlink_t);
     char *gid_tVal = uid_tVal + sizeof(uid_t);
     char *dev_tVal2 = gid_tVal + sizeof(gid_t);
     char *off_tVal = dev_tVal2 + sizeof(dev_t);
@@ -662,21 +662,21 @@ int server_getattr(client_args *client){
     char *time_tVal2 = time_tVal1 + sizeof(time_t);
     char *time_tVal3 = time_tVal2 + sizeof(time_t);
     
-    struct stat stbuf;
+    struct stat *stbuf = malloc(sizeof(struct stat));
     
-    st.st_dev = *((int*)dev_tVal1);
-    st.st_ino = *((int*)ino_tVal);
-    st.st_mode = *((int*)mode_tVal);
-    st.st_nlink = *((int*)nlinkVal);
-    st.st_uid = *((int*)uid_tVal);
-    st.st_gid = *((int*)gid_tVal);
-    st.st_rdev = *((int*)dev_tVal2);
-    st.st_size = *((int*)off_tVal);
-    st.st_blksize = *((int*)blksize_tVal);
-    st.st_blocks = *((int*)blkcnt_tVal);
-    st.st_atime = *((int*)time_tVal1);
-    st.st_mtime = *((int*)time_tVal2);
-    st.st_ctime = *((int*)time_tVal3);
+    stbuf->st_dev = *((int*)dev_tVal1);
+    stbuf->st_ino = *((int*)ino_tVal);
+    stbuf->st_mode = *((int*)mode_tVal);
+    stbuf->st_nlink = *((int*)nlinkVal);
+    stbuf->st_uid = *((int*)uid_tVal);
+    stbuf->st_gid = *((int*)gid_tVal);
+    stbuf->st_rdev = *((int*)dev_tVal2);
+    stbuf->st_size = *((int*)off_tVal);
+    stbuf->st_blksize = *((int*)blksize_tVal);
+    stbuf->st_blocks = *((int*)blkcnt_tVal);
+    stbuf->st_atime = *((int*)time_tVal1);
+    stbuf->st_mtime = *((int*)time_tVal2);
+    stbuf->st_ctime = *((int*)time_tVal3);
     
     int result = lstat(path, stbuf);
     
