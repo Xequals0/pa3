@@ -697,6 +697,33 @@ int server_getattr(client_args *client){
 
 }
 
+int server_opendir(client_args *client){
+    char dirnameBuffer[255];
+    bzero(&dirnameBuffer, sizeof(dirnameBuffer));
+    char *directory_name = (char *)malloc(sizeof(char));
+    
+    int recv_dir;
+    if((recv_dir = recv(client->fd, dirnameBuffer, sizeof(dirnameBuffer), 0)) == -1)
+        perror("Error reading directory name from the client\n");
+    
+    directory_name[recv_dir] = '\0';
+    strcpy(directory_name, dirnameBuffer);
+    
+    DIR *fd
+    fd = opendir(directory_name);
+    if(fd == NULL){   //CHECK IF THIS STUFF IS RIGHT
+        perror("Unable to open the requested directory.");
+        int error = htonl(errno);
+        if(send(client->fd, &error, sizeof(error), 0) == -1){
+            printf("Error sending errno to the client");
+        }
+    }
+    /*
+     if(send(client->fd, &fd, sizeof(fd), 0) == -1)
+     perror("Error sending fd to the client");
+     */
+    return fd;
+}
 
 
 void* selectMethod(void *arg){
