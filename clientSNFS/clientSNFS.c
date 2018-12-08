@@ -26,97 +26,97 @@ int openConnection();
 //int clientSocket;
 int main(int argc, const char* argv[])
 {
-	int i;
-	char* port;
-	char* address;
-	char* mount;
-
-	if(argc != 7){
-		printf("Usage %s: <host> <port>\n", argv[0]);
-		return -1;
-	}
-
-	for(i = 1; i < argc; i++)
-	{
-		if(strcmp(argv[i], "-port") == 0)
-		{
-			i++;
-			port = (char*)malloc(strlen(argv[i]) + 1);
-			strcpy(port, argv[i]);
-		}
-		else if(strcmp(argv[i], "-address") == 0)
-		{
-			i++;
-			address = (char*)malloc(strlen(argv[i]) + 1);
-			strcpy(address, argv[i]);
-
-		}
-		else if(strcmp(argv[i], "-mount") == 0)
-		{
-			i++;
-			mount = (char*)malloc(strlen(argv[i]) + 1);
-			strcpy(mount, argv[i]);
-		}
-	}
-
-	printf("%s-%s-%s\n", port, address, mount);
-	   
-	while(1){
-		printf("Enter one of the following:\n\t\"open <filename>\"\n\t\"close <file descriptor>\"\n\t\"quit\"\n");
-		int i;
-		char input[100];
-		char commands[4][100]; // stores command and its arguements, ex: read, write, etc
-		
-		while(fgets(input, sizeof(input), stdin) == NULL){ ; }
-		
-		//remove newline character
-		char*ch;
-		if((ch=strchr(input, '\n')) != NULL)
-			*ch = '\0';
-
-		char *tok = input, *tmp = input;
-		int first = 1;
-		for(i = 0; i < 4; i++){
-			if(tok == NULL) break;
-			strsep(&tmp, " ");
-
-			if(tok[0] == '\0' && first != 1){
-				i--;
-			}
-			else
-				strcpy(commands[i], tok);
-
-			tok = tmp;
-
-			if(first == 1) first = 0;
-		}
-
-		char *endptr = (char *)calloc(101, sizeof(char));
-		if(strcmp("quit", commands[0]) == 0)
-			break;
-		/*else if(strcmp("open", commands[0]) == 0){
-			char *path = commands[1];
-			printf("flag is: %s\n", commands[2]);
-			int flags = getFlags(commands[2]);
-			if(snfs_open(path, flags) == -1){
-				if(errno == 0)
-					herror("Error opening file\n");
-				else
-					perror("Error opening file\n");
-			}	
-		}*/
-		/*else if(strcmp("close", commands[0]) == 0){
-			int fd = strtol(commands[1], &endptr, 10);
-			if(snfs_close(fd) == -1){
-				if(errno == 0)
-					herror("Error opening file\n");
-				else
-					perror("Error opening file\n");
-			}			
-		} */
-	}
-
-
+    int i;
+    char* port;
+    char* address;
+    char* mount;
+    
+    if(argc != 7){
+        printf("Usage %s: <host> <port>\n", argv[0]);
+        return -1;
+    }
+    
+    for(i = 1; i < argc; i++)
+    {
+        if(strcmp(argv[i], "-port") == 0)
+        {
+            i++;
+            port = (char*)malloc(strlen(argv[i]) + 1);
+            strcpy(port, argv[i]);
+        }
+        else if(strcmp(argv[i], "-address") == 0)
+        {
+            i++;
+            address = (char*)malloc(strlen(argv[i]) + 1);
+            strcpy(address, argv[i]);
+            
+        }
+        else if(strcmp(argv[i], "-mount") == 0)
+        {
+            i++;
+            mount = (char*)malloc(strlen(argv[i]) + 1);
+            strcpy(mount, argv[i]);
+        }
+    }
+    
+    printf("%s-%s-%s\n", port, address, mount);
+    
+    while(1){
+        printf("Enter one of the following:\n\t\"open <filename>\"\n\t\"close <file descriptor>\"\n\t\"quit\"\n");
+        int i;
+        char input[100];
+        char commands[4][100]; // stores command and its arguements, ex: read, write, etc
+        
+        while(fgets(input, sizeof(input), stdin) == NULL){ ; }
+        
+        //remove newline character
+        char*ch;
+        if((ch=strchr(input, '\n')) != NULL)
+            *ch = '\0';
+        
+        char *tok = input, *tmp = input;
+        int first = 1;
+        for(i = 0; i < 4; i++){
+            if(tok == NULL) break;
+            strsep(&tmp, " ");
+            
+            if(tok[0] == '\0' && first != 1){
+                i--;
+            }
+            else
+                strcpy(commands[i], tok);
+            
+            tok = tmp;
+            
+            if(first == 1) first = 0;
+        }
+        
+        char *endptr = (char *)calloc(101, sizeof(char));
+        if(strcmp("quit", commands[0]) == 0)
+            break;
+        /*else if(strcmp("open", commands[0]) == 0){
+         char *path = commands[1];
+         printf("flag is: %s\n", commands[2]);
+         int flags = getFlags(commands[2]);
+         if(snfs_open(path, flags) == -1){
+         if(errno == 0)
+         herror("Error opening file\n");
+         else
+         perror("Error opening file\n");
+         }
+         }*/
+        /*else if(strcmp("close", commands[0]) == 0){
+         int fd = strtol(commands[1], &endptr, 10);
+         if(snfs_close(fd) == -1){
+         if(errno == 0)
+         herror("Error opening file\n");
+         else
+         perror("Error opening file\n");
+         }
+         } */
+    }
+    
+    
     return 0;
 }
 
@@ -254,9 +254,44 @@ int snfs_getattr(const char *path, struct stat *stbuf){
     sleep(1);
     
     //send stbuf to server
+    int sizeStruct = sizeof(dev_t) + sizeof(ino_t) + sizeof(mode_t) + sizeof(nlink) + sizeof(uid_t) + sizeof(gid_t) + sizeof(dev_t) + sizeof(off_t) + sizeof(blksize_t) + sizeof(blkcnt_t) + (3 * sizeof(time_t) );
     
+    char *serialized = malloc(sizeof(char) * sizeStruct);
+    char *dev_tVal1 = serialized;
+    char *ino_tVal = dev_tVal1 + sizeof(dev_tVal1);
+    char *mode_tVal = ino_tVal + sizeof(ino_t);
+    char *nlinkVal = mode_tVal + sizeof(mode_t);
+    char *uid_tVal = nlinkVal + sizeof(nlink);
+    char *gid_tVal = uid_tVal + sizeof(uid_t);
+    char *dev_tVal2 = gid_tVal + sizeof(gid_t);
+    char *off_tVal = dev_tVal2 + sizeof(dev_t);
+    char *blksize_tVal = off_tVal + sizeof(off_tVal);
+    char *blkcnt_tVal = blksize_tVal + sizeof(blksize_t);
+    char *time_tVal1 = blkcnt_tVal + sizeof(blkcnt_t);
+    char *time_tVal2 = time_tVal1 + sizeof(time_t);
+    char *time_tVal3 = time_tVal2 + sizeof(time_t);
     
- 
+    *((int*)dev_tVal1) = stbuf->st_dev;
+    *((int*)ino_tVal) = stbuf->st_ino;
+    *((int*)mod_tVal) = stbuf->st_mode;
+    *((int*)nlinkVal) = stbuf->st_nlink;
+    *((int*)uid_tVal) = stbuf->st_uid;
+    *((int*)gid_tVal) = stbuf->st_gid;
+    *((int*)dev_tVal2) = stbuf->st_rdev;
+    *((int*)off_tVal) = stbuf->st_size;
+    *((int*)blksize_tVal) = st->st_blksize;
+    *((int*)blkcnt_tVal) = stbuf->st_blocks;
+    *((int*)time_tVal1) = st_atime;
+    *((int*)time_tVal2) = st_mtime;
+    *((int*)time_tVal3) = st_ctime;
+    
+    int sendSize = htonl(sizeStruct);
+    
+    int numBytesSent = send(connection, serialized, sendSize, 0);
+    if(numBytesSent < 0)
+        printf("Error sending path to the server\n");
+    else
+        printf("Success sending path(%s) to the server\n", path);
     
     
     //recv return value
@@ -533,7 +568,7 @@ int snfs_mkdir(const char *path, mode_t mode){
 }
 
 int openConnection(){
- int port = 13175;
+    int port = 13175;
     
     int clientSocket;
     struct sockaddr_in serv_addr;
