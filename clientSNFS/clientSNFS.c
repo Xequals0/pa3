@@ -91,7 +91,7 @@ int main(int argc, const char* argv[])
             if(first == 1) first = 0;
         }
         
-        char *endptr = (char *)calloc(101, sizeof(char));
+        //char *endptr = (char *)calloc(101, sizeof(char));
         if(strcmp("quit", commands[0]) == 0)
             break;
         /*else if(strcmp("open", commands[0]) == 0){
@@ -254,14 +254,14 @@ int snfs_getattr(const char *path, struct stat *stbuf){
     sleep(1);
     
     //send stbuf to server
-    int sizeStruct = sizeof(dev_t) + sizeof(ino_t) + sizeof(mode_t) + sizeof(nlink) + sizeof(uid_t) + sizeof(gid_t) + sizeof(dev_t) + sizeof(off_t) + sizeof(blksize_t) + sizeof(blkcnt_t) + (3 * sizeof(time_t) );
+    int sizeStruct = sizeof(dev_t) + sizeof(ino_t) + sizeof(mode_t) + sizeof(nlink_t) + sizeof(uid_t) + sizeof(gid_t) + sizeof(dev_t) + sizeof(off_t) + sizeof(blksize_t) + sizeof(blkcnt_t) + (3 * sizeof(time_t) );
     
     char *serialized = malloc(sizeof(char) * sizeStruct);
     char *dev_tVal1 = serialized;
     char *ino_tVal = dev_tVal1 + sizeof(dev_tVal1);
     char *mode_tVal = ino_tVal + sizeof(ino_t);
     char *nlinkVal = mode_tVal + sizeof(mode_t);
-    char *uid_tVal = nlinkVal + sizeof(nlink);
+    char *uid_tVal = nlinkVal + sizeof(nlink_t);
     char *gid_tVal = uid_tVal + sizeof(uid_t);
     char *dev_tVal2 = gid_tVal + sizeof(gid_t);
     char *off_tVal = dev_tVal2 + sizeof(dev_t);
@@ -273,21 +273,21 @@ int snfs_getattr(const char *path, struct stat *stbuf){
     
     *((int*)dev_tVal1) = stbuf->st_dev;
     *((int*)ino_tVal) = stbuf->st_ino;
-    *((int*)mod_tVal) = stbuf->st_mode;
+    *((int*)mode_tVal) = stbuf->st_mode;
     *((int*)nlinkVal) = stbuf->st_nlink;
     *((int*)uid_tVal) = stbuf->st_uid;
     *((int*)gid_tVal) = stbuf->st_gid;
     *((int*)dev_tVal2) = stbuf->st_rdev;
     *((int*)off_tVal) = stbuf->st_size;
-    *((int*)blksize_tVal) = st->st_blksize;
+    *((int*)blksize_tVal) = stbuf->st_blksize;
     *((int*)blkcnt_tVal) = stbuf->st_blocks;
-    *((int*)time_tVal1) = st_atime;
-    *((int*)time_tVal2) = st_mtime;
-    *((int*)time_tVal3) = st_ctime;
+    *((int*)time_tVal1) = stbuf->st_atime;
+    *((int*)time_tVal2) = stbuf->st_mtime;
+    *((int*)time_tVal3) = stbuf->st_ctime;
     
     int sendSize = htonl(sizeStruct);
     
-    int numBytesSent = send(connection, serialized, sendSize, 0);
+    numBytesSent = send(connection, serialized, sendSize, 0);
     if(numBytesSent < 0)
         printf("Error sending path to the server\n");
     else
