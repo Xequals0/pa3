@@ -26,14 +26,41 @@ int openConnection();
 //int clientSocket;
 int main(int argc, const char* argv[])
 {
-	if(argc != 3){
+	int i;
+	char* port;
+	char* address;
+	char* mount;
+
+	if(argc != 7){
 		printf("Usage %s: <host> <port>\n", argv[0]);
-		return 0;
+		return -1;
 	}
 
-	//char* host = argv[1];
-	//char *port = argv[2]; 
-   
+	for(i = 1; i < argc; i++)
+	{
+		if(strcmp(argv[i], "-port") == 0)
+		{
+			i++;
+			port = (char*)malloc(strlen(argv[i]) + 1);
+			strcpy(port, argv[i]);
+		}
+		else if(strcmp(argv[i], "-address") == 0)
+		{
+			i++;
+			address = (char*)malloc(strlen(argv[i]) + 1);
+			strcpy(address, argv[i]);
+
+		}
+		else if(strcmp(argv[i], "-mount") == 0)
+		{
+			i++;
+			mount = (char*)malloc(strlen(argv[i]) + 1);
+			strcpy(mount, argv[i]);
+		}
+	}
+
+	printf("%s-%s-%s\n", port, address, mount);
+	   
 	while(1){
 		printf("Enter one of the following:\n\t\"open <filename>\"\n\t\"close <file descriptor>\"\n\t\"quit\"\n");
 		int i;
