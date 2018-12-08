@@ -637,12 +637,46 @@ int server_getattr(client_args *client){
     strcpy(path, pathBuffer);
     
     //recv stbuf
+    char stbufBuffer[512];
+    bzero(&stbufBuffer, sizeof(stbufBuffer));
+    char *serializedStbuf = (char *)malloc(sizeof(char));
     
+    int recv_stbuf;
+    if((recv_path = recv(client->fd, stbufBuffer, sizeof(stbufBuffer), 0)) == -1)
+        perror("Error reading stbuf from the client\n");
     
+    path[recv_stbuf] = '\0';
+    strcpy(serializedStbuf, stbufBuffer);
     
+    char *dev_tVal1 = serializedStbuf;
+    char *ino_tVal = dev_tVal1 + sizeof(dev_tVal1);
+    char *mode_tVal = ino_tVal + sizeof(ino_t);
+    char *nlinkVal = mode_tVal + sizeof(mode_t);
+    char *uid_tVal = nlinkVal + sizeof(nlink);
+    char *gid_tVal = uid_tVal + sizeof(uid_t);
+    char *dev_tVal2 = gid_tVal + sizeof(gid_t);
+    char *off_tVal = dev_tVal2 + sizeof(dev_t);
+    char *blksize_tVal = off_tVal + sizeof(off_tVal);
+    char *blkcnt_tVal = blksize_tVal + sizeof(blksize_t);
+    char *time_tVal1 = blkcnt_tVal + sizeof(blkcnt_t);
+    char *time_tVal2 = time_tVal1 + sizeof(time_t);
+    char *time_tVal3 = time_tVal2 + sizeof(time_t);
     
+    struct stat stbuf;
     
-    
+    st.st_dev = *((int*)dev_tVal1);
+    st.st_ino = *((int*)ino_tVal);
+    st.st_mode = *((int*)mode_tVal);
+    st.st_nlink = *((int*)nlinkVal);
+    st.st_uid = *((int*)uid_tVal);
+    st.st_gid = *((int*)gid_tVal);
+    st.st_rdev = *((int*)dev_tVal2);
+    st.st_size = *((int*)off_tVal);
+    st.st_blksize = *((int*)blksize_tVal);
+    st.st_blocks = *((int*)blkcnt_tVal);
+    st.st_atime = *((int*)time_tVal1);
+    st.st_mtime = *((int*)time_tVal2);
+    st.st_ctime = *((int*)time_tVal3);
     
     int result = lstat(path, stbuf);
     
