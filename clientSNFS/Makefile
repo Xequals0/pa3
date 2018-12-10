@@ -1,4 +1,4 @@
-FLAGS = -W -Wall -g
+FLAGS = -W -Wall -g `pkg-config fuse --cflags --libs`
 CC = gcc
 
 all: clientSNFS
