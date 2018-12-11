@@ -641,6 +641,44 @@ int server_readdir(client_args *client){
     return 0;
 }
 
+int server_truncate(client_args *client){
+    char pathBuffer[256];
+    bzero(&pathBuffer, sizeof(pathBuffer));
+    char *path = (char *)malloc(256);
+    strcpy(path, mount);
+    
+    int recv_path;
+    if((recv_path = recv(client->fd, pathBuffer, sizeof(pathBuffer), 0)) == -1)
+        perror("Error reading path from the client\n");
+    
+    strcat(path, pathBuffer);
+
+    int sizeN;
+    bzero(&sizeN, sizeof(sizeN));
+    
+    if(recv(client->fd, &sizeN, sizeof(sizeN), 0) < 0)
+        printf("Error reading size from the client\n");
+    
+    int size = ntohl(sizeN);
+
+    int result = truncate(path, size);
+
+    int res = htonl(result);
+    
+    //send result from lstat call
+    if(send(client->fd, &res, sizeof(res) , 0) == -1)
+        perror("Could not send the truncate return value to the client\n");
+    
+    //send errno if there is an error
+    if(result == -1){
+        int error = htonl(errno);
+        if(send(client->fd, &error, sizeof(error), 0) == -1)
+            perror("Could not send errno to the client");
+    }
+
+    return result;
+}
+
 int server_opendir(client_args *client){
     char dirnameBuffer[255];
     bzero(&dirnameBuffer, sizeof(dirnameBuffer));
@@ -694,7 +732,8 @@ void* selectMethod(void *arg){
         
     }
     else if(command == 5){ //truncate
-        
+        puts("calling truncate");
+        server_truncate(args);
     }
     else if(command == 6){ //getattr
         //printf("calling server_getattr");
