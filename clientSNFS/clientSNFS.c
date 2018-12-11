@@ -17,24 +17,37 @@
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
-
+#include <dirent.h>
 
 int getFlags(char *flags);
-//int snfs_close(int fd);
 int openConnection();
+int snfs_open(const char *path, struct fuse_file_info *fi);
+int snfs_mkdir(const char *path, mode_t mode);
+int snfs_getattr(const char *path, struct stat *stbuf);
+int snfs_readdir(const char* path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi);
+int snfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi);
+
+static struct fuse_operations snfs_oper = {
+    .open = snfs_open,
+    //.close = snfs_close
+    /*.create = snfs_create,
+    .truncate = snfs_truncate,*/
+    .getattr = snfs_getattr,
+    .read = snfs_read,
+    /*.write = snfs_write,
+    .opendir = snfs_opendir,*/
+    .readdir = snfs_readdir,/*
+    .releasedir = snfs_releasedir,*/
+    .mkdir = snfs_mkdir
+};
 
 //int clientSocket;
-int main(int argc, const char* argv[])
+int main(int argc, char* argv[])
 {
     int i;
     char* port;
     char* address;
     char* mount;
-    
-    if(argc != 7){
-        printf("Usage %s: <host> <port>\n", argv[0]);
-        return -1;
-    }
     
     for(i = 1; i < argc; i++)
     {
@@ -59,65 +72,7 @@ int main(int argc, const char* argv[])
         }
     }
     
-    printf("%s-%s-%s\n", port, address, mount);
-    
-    while(1){
-        printf("Enter one of the following:\n\t\"open <filename>\"\n\t\"close <file descriptor>\"\n\t\"quit\"\n");
-        int i;
-        char input[100];
-        char commands[4][100]; // stores command and its arguements, ex: read, write, etc
-        
-        while(fgets(input, sizeof(input), stdin) == NULL){ ; }
-        
-        //remove newline character
-        char*ch;
-        if((ch=strchr(input, '\n')) != NULL)
-            *ch = '\0';
-        
-        char *tok = input, *tmp = input;
-        int first = 1;
-        for(i = 0; i < 4; i++){
-            if(tok == NULL) break;
-            strsep(&tmp, " ");
-            
-            if(tok[0] == '\0' && first != 1){
-                i--;
-            }
-            else
-                strcpy(commands[i], tok);
-            
-            tok = tmp;
-            
-            if(first == 1) first = 0;
-        }
-        
-        //char *endptr = (char *)calloc(101, sizeof(char));
-        if(strcmp("quit", commands[0]) == 0)
-            break;
-        /*else if(strcmp("open", commands[0]) == 0){
-         char *path = commands[1];
-         printf("flag is: %s\n", commands[2]);
-         int flags = getFlags(commands[2]);
-         if(snfs_open(path, flags) == -1){
-         if(errno == 0)
-         herror("Error opening file\n");
-         else
-         perror("Error opening file\n");
-         }
-         }*/
-        /*else if(strcmp("close", commands[0]) == 0){
-         int fd = strtol(commands[1], &endptr, 10);
-         if(snfs_close(fd) == -1){
-         if(errno == 0)
-         herror("Error opening file\n");
-         else
-         perror("Error opening file\n");
-         }
-         } */
-    }
-    
-    
-    return 0;
+    return fuse_main(argc, argv, &snfs_oper, NULL);
 }
 
 int snfs_open(const char *path, struct fuse_file_info *fi){
@@ -163,6 +118,8 @@ int snfs_open(const char *path, struct fuse_file_info *fi){
 		return -1;		
 	}
 
+    fi->fh = output_fd;
+
 	printf("fd recveived was %d\n", output_fd);
 
 	//receive any errors
@@ -178,7 +135,7 @@ int snfs_open(const char *path, struct fuse_file_info *fi){
 	printf("\n");
 	close(connection);
     
-	return output_fd;	
+	return 0;	
 }
 /*
 int snfs_close(int fd){
@@ -235,65 +192,23 @@ int snfs_getattr(const char *path, struct stat *stbuf){
     
     int command = htonl(6);
     
-    printf("Sending getattr command to the server\n");
     if(send(connection, &command, sizeof(command), 0) < 0)
         printf("Error sending getattr command to the server\n");
     
     sleep(1);
     
     //send path to the server
-    int pathLen  = strlen(path);
+    int pathLen  = strlen(path) + 1;
     int pathLength = htonl(pathLen);
     
     int numBytesSent = send(connection, path, pathLength, 0);
     if(numBytesSent < 0)
         printf("Error sending path to the server\n");
     else
-        printf("Success sending path(%s) to the server\n", path);
+        //printf("Success sending path(%s) to the server\n", path);
     
     sleep(1);
-    
-    //send stbuf to server
-    int sizeStruct = sizeof(dev_t) + sizeof(ino_t) + sizeof(mode_t) + sizeof(nlink_t) + sizeof(uid_t) + sizeof(gid_t) + sizeof(dev_t) + sizeof(off_t) + sizeof(blksize_t) + sizeof(blkcnt_t) + (3 * sizeof(time_t) );
-    
-    char *serialized = malloc(sizeof(char) * sizeStruct);
-    char *dev_tVal1 = serialized;
-    char *ino_tVal = dev_tVal1 + sizeof(dev_tVal1);
-    char *mode_tVal = ino_tVal + sizeof(ino_t);
-    char *nlinkVal = mode_tVal + sizeof(mode_t);
-    char *uid_tVal = nlinkVal + sizeof(nlink_t);
-    char *gid_tVal = uid_tVal + sizeof(uid_t);
-    char *dev_tVal2 = gid_tVal + sizeof(gid_t);
-    char *off_tVal = dev_tVal2 + sizeof(dev_t);
-    char *blksize_tVal = off_tVal + sizeof(off_tVal);
-    char *blkcnt_tVal = blksize_tVal + sizeof(blksize_t);
-    char *time_tVal1 = blkcnt_tVal + sizeof(blkcnt_t);
-    char *time_tVal2 = time_tVal1 + sizeof(time_t);
-    char *time_tVal3 = time_tVal2 + sizeof(time_t);
-    
-    *((int*)dev_tVal1) = stbuf->st_dev;
-    *((int*)ino_tVal) = stbuf->st_ino;
-    *((int*)mode_tVal) = stbuf->st_mode;
-    *((int*)nlinkVal) = stbuf->st_nlink;
-    *((int*)uid_tVal) = stbuf->st_uid;
-    *((int*)gid_tVal) = stbuf->st_gid;
-    *((int*)dev_tVal2) = stbuf->st_rdev;
-    *((int*)off_tVal) = stbuf->st_size;
-    *((int*)blksize_tVal) = stbuf->st_blksize;
-    *((int*)blkcnt_tVal) = stbuf->st_blocks;
-    *((int*)time_tVal1) = stbuf->st_atime;
-    *((int*)time_tVal2) = stbuf->st_mtime;
-    *((int*)time_tVal3) = stbuf->st_ctime;
-    
-    int sendSize = htonl(sizeStruct);
-    
-    numBytesSent = send(connection, serialized, sendSize, 0);
-    if(numBytesSent < 0)
-        printf("Error sending path to the server\n");
-    else
-        printf("Success sending path(%s) to the server\n", path);
-    
-    
+        
     //recv return value
     int retVal;
     if(recv(connection, &retVal, sizeof(retVal), 0) == -1)
@@ -305,13 +220,21 @@ int snfs_getattr(const char *path, struct stat *stbuf){
     int errorMessage;
     if(result == -1){
         if(recv(connection, &errorMessage, sizeof(errorMessage), 0) == -1){
-            perror("Could not recieve error message from the server\n");
+            perror("Could not error message from the server\n");
             return -1;
         }
         errno = ntohl(errorMessage);
         perror("Error from the server\n");
+        result = -errno;
     }
-    printf("\n");
+    else if(result == 0)
+    {
+        if(recv(connection, stbuf, sizeof(struct stat), 0) == -1){
+            perror("Could not recieve stat struct from the server\n");
+            return -1;
+        }
+
+    }
     close(connection);
     
     return result;
@@ -328,8 +251,7 @@ int getFlags(char *flags){
 		return -1;
 }
 
-int snfs_read(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi){
-    (void) fi; //to get rid of warning
+int snfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi){
 
     int connection = openConnection();
     
@@ -346,44 +268,26 @@ int snfs_read(const char *path, const char *buf, size_t size, off_t offset, stru
     
     sleep(1);
     
-    //send path
-    int pathLen = strlen(path);
-    int pathLength = htonl(pathLen);
-    
-    int numBytesSent = send(connection, path, pathLength, 0);
+    //send fi
+    printf("!-!-%d\n", fi->fh);
+    int numBytesSent = send(connection, &(fi->fh), sizeof(uint64_t), 0);
     if(numBytesSent < 0)
         printf("Error sending path to the server\n");
     else
-        printf("Success sending path(%s) to the server\n", path);
+        printf("Success sending fi to the server\n");
     
     sleep(1);
     
-    //send buf
-    int bufLen = strlen(buf);
-    int bufLength = htonl(bufLen);
-    
-    numBytesSent = send(connection, buf, bufLength, 0);
-    if(numBytesSent < 0)
-        printf("Error sending buf to the server\n");
-    else
-        printf("Success sending buf(%s) to the server\n", buf);
-    
-    sleep(1);
-    
-    //send size
-    int sizeN = htonl(size);
-    
+    //send size    
     printf("Sending size to the server\n");
-    if(send(connection, &sizeN, sizeof(sizeN), 0) < 0)
+    if(send(connection, &size, sizeof(size_t), 0) < 0)
         printf("Error sending size to the server\n");
     
     sleep(1);
     
-    //send offset
-    int offsetN = htonl(offset);
-    
+    //send offset    
     printf("Sending offset to the server\n");
-    if(send(connection, &offsetN, sizeof(offsetN), 0) < 0)
+    if(send(connection, &offset, sizeof(off_t), 0) < 0)
         printf("Error sending offset to the server\n");
     
     sleep(1);
@@ -404,6 +308,13 @@ int snfs_read(const char *path, const char *buf, size_t size, off_t offset, stru
         }
         errno = ntohl(errorMessage);
         perror("Error from the server\n");
+    }
+    else
+    {
+        if(recv(connection, buf, size, 0) == -1){
+            perror("Could not recieve buf from the server\n");
+            return -1;
+        }
     }
     printf("\n");
     close(connection);
@@ -495,12 +406,55 @@ int snfs_write(const char *path, const char *buf, size_t size, off_t offset, str
 /*
 int snfs_opendir(const char *path, struct fuse_file_info *fi){
 
-}
+}*/
 
 int snfs_readdir(const char* path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi){
-    
-}
 
+    int connection = openConnection();
+    
+    if(connection < 0){
+        h_errno = HOST_NOT_FOUND;
+        return -1;
+    }
+    
+    int command = htonl(8);
+    
+    if(send(connection, &command, sizeof(command), 0) < 0)
+        printf("Error sending readdir command to the server\n");
+    
+    sleep(1);
+    
+    //send path to the server
+    int pathLen  = strlen(path) + 1;
+    int pathLength = htonl(pathLen);
+    
+    int numBytesSent = send(connection, path, pathLength, 0);
+    if(numBytesSent < 0)
+        printf("Error sending path to the server\n");
+    else
+        printf("Success sending path(%s) to the server\n", path);
+    
+    sleep(1);
+
+    int x;
+    while(1)
+    {
+        recv(connection, &x, sizeof(int), 0);
+        if(x == -1) break;
+
+        struct stat st;
+        memset(&st, 0, sizeof(st));
+        char dname[256];
+        recv(connection, dname, x, 0);
+        recv(connection, &st, sizeof(struct stat), 0);
+        if(filler(buf, dname, &st, 0)) break;
+    }
+
+    if(x != -1) recv(connection, &x, sizeof(int), 0);
+
+    return 0;
+}
+/*
 int releasedir(const char *path, struct fuse_file_info *fi){
 
 }*/
@@ -515,7 +469,7 @@ int snfs_mkdir(const char *path, mode_t mode){
     
     int command = htonl(10);
     
-    printf("Sending open command to the server\n");
+    printf("Sending mkdir command to the server\n");
     if(send(connection, &command, sizeof(command), 0) < 0)
         printf("Error sending open command to the server\n");
     
@@ -533,14 +487,11 @@ int snfs_mkdir(const char *path, mode_t mode){
     
     sleep(1);
     
-    //send mode to server
-    int modeN = htonl(mode);
-    
-    numBytesSent = send(connection, &modeN, sizeof(modeN), 0);
+    //send mode to server    
+    numBytesSent = send(connection, &mode, sizeof(mode), 0);
     if(numBytesSent < 0)
-        printf("Error sending path to the server\n");
+        printf("Error sending modeN to the server\n");
     else
-        printf("Success sending path(%s) to the server\n", path);
     
     sleep(1);
     
@@ -581,7 +532,7 @@ int openConnection(){
     }
 
     serv_addr.sin_family = AF_INET;
-    server = gethostbyname("localhost"); //Update this later
+    server = gethostbyname("ls.cs.rutgers.edu"); //Update this later
     if (server == 0) { //Not sure if I did this right?
         printf("Failed to resolve the host. Error: %d\n",errno);
         exit(1);
@@ -597,17 +548,3 @@ int openConnection(){
     }
 	return clientSocket;
 }
-
-static struct fuse_operations snfs_oper = {
-	.open = snfs_open,
-	//.close = snfs_close
-	/*.create = snfs_create,
-	.truncate = snfs_truncate,
-	.getattr = snfs_getattr,
-	.read = snfs_read,
-	.write = snfs_write,
-	.opendir = snfs_opendir,
-	.readdir = snfs_readdir,
-	.releasedir = snfs_releasedir,
-	.mkdir = snfs_mkdir */
-};

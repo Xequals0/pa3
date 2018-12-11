@@ -11,6 +11,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <netdb.h>
+#include <dirent.h>
+#include <fuse.h>
+
 
 /* typedef struct File{
 	char *pathname;
@@ -66,11 +69,23 @@ pthread_mutex_t mutex;
 pthread_cond_t finishedWriting;
 pthread_cond_t finishedReading;
 */
-
-int main()//(int argc, const char* argv[])
+char* mount;
+int main(int argc, char* argv[])//(int argc, const char* argv[])
 {
 	//char* port = argv[1];
     int port = 13175; //This is temporary; We should obtain this from the user.
+
+    int i;
+    for(i = 1; i < argc; i++)
+    {
+        if(strcmp(argv[i], "-mount") == 0)
+        {
+            i++;
+            mount = (char*)malloc(strlen(argv[i]) + 1);
+            strcpy(mount, argv[i]);
+        }
+    }
+
 
     	int serverSocket, *clientSocket;
 	socklen_t clientlen = sizeof(struct sockaddr_storage);
@@ -253,9 +268,10 @@ fileNode* searchDataBaseFileName(client_args *client, char *filename){
 */
 
 int server_open(client_args *client){
-	char filenameBuffer[255];
+	char filenameBuffer[256];
 	bzero(&filenameBuffer, sizeof(filenameBuffer));
-	char *filename = (char *)malloc(sizeof(char));
+	char *filename = (char *)malloc(256);
+    strcpy(filename, mount);
 
 	int recv_file;
 	if((recv_file = recv(client->fd, filenameBuffer, sizeof(filenameBuffer), 0)) == -1)
@@ -267,7 +283,7 @@ int server_open(client_args *client){
 	int fileExists = 0;*/
 
 	filename[recv_file] = '\0';
-	strcpy(filename, filenameBuffer);
+	strcat(filename, filenameBuffer);
 
  	/*searchDatabase = searchDataBaseFileName(client, filename);
 
@@ -321,6 +337,7 @@ int server_open(client_args *client){
     
     int fd = open(filename, flag);
     
+
 	if(send(client->fd, &fd, sizeof(fd), 0) == -1)
 		perror("Error sending fd to the client");
 
@@ -337,69 +354,29 @@ int server_open(client_args *client){
 
 int server_read(client_args *client){
     
-    //recv path
-    char pathBuffer[256];
-    bzero(&pathBuffer, sizeof(pathBuffer));
-    char *path = (char *)malloc(sizeof(char));
-    
-    int recv_path;
-    if((recv_path = recv(client->fd, pathBuffer, sizeof(pathBuffer), 0)) == -1)
+    //recv fi
+    uint64_t fh;
+    int recv_fi;
+
+    if((recv_fi = recv(client->fd, &fh, sizeof(fh), 0)) == -1)
         perror("Error reading path from the client\n");
     
-    path[recv_path] = '\0';
-    strcpy(path, pathBuffer);
-    
-    //recv buf
-    char bufBuffer[256];
-    bzero(&bufBuffer, sizeof(bufBuffer));
-    char *buf = (char *)malloc(sizeof(char));
-    
-    int recv_buf;
-    if((recv_buf = recv(client->fd, bufBuffer, sizeof(bufBuffer), 0)) == -1)
-        perror("Error reading buf from the client\n");
-    
-    path[recv_buf] = '\0';
-    strcpy(buf, bufBuffer);
-    
     //recv size
-    int sizeN;
-    bzero(&sizeN, sizeof(sizeN));
+    size_t size;
     
-    if(recv(client->fd, &sizeN, sizeof(sizeN), 0) < 0)
+    if(recv(client->fd, &size, sizeof(size_t), 0) < 0)
         printf("Error reading size from the client\n");
-    
-    int size = ntohl(sizeN);
-    
+        
     //recv offset
-    int offsetN;
-    bzero(&offsetN, sizeof(offsetN));
+    off_t offset;
     
-    if(recv(client->fd, &offsetN, sizeof(offsetN), 0) < 0)
+    if(recv(client->fd, &offset, sizeof(off_t), 0) < 0)
         printf("Error reading offset from the client\n");
     
-    int offset = ntohl(offsetN);
-    
-    
-    int fd = open(path, O_RDONLY);
-    
-    if (fd == -1){
-        
-        int retVal = htonl(-1);
-        
-        //lets client know that an error has occured
-        if(send(client->fd, &retVal, sizeof(retVal), 0) == -1)
-            perror("Could not send -1 to the client\n");
-        
-        //send errno
-        int error = htonl(errno);
-        if(send(client->fd, &error, sizeof(error), 0) == -1)
-            perror("Could not send errno to the client");
-        
-        
-        return errno;
-    }
-    
-    int res = pread(fd, buf, size, offset);
+    char *buf = (char*)malloc(size);
+    int res = pread(fh, buf, size, offset);
+
+    printf("\nfh: %d buf: %s\n", fh, buf);
     
     if (res == -1){
         int retVal = htonl(-1);
@@ -412,21 +389,20 @@ int server_read(client_args *client){
         int error = htonl(errno);
         if(send(client->fd, &error, sizeof(error), 0) == -1)
             perror("Could not send errno to the client");
-        
-        
-        close(fd);
-        
+                
         return errno;
     }
     
     int result = htonl(res);
     
-    //send result from pwrite call
+    //send result from pread call
     if(send(client->fd, &result, sizeof(result) , 0) == -1)
         perror("Could not send the write return value to the client\n");
-    
-    close(fd);
-    
+
+    //send buffer
+    if(send(client->fd, buf, size , 0) == -1)
+        perror("Could not send the read value to the client\n");
+        
     return res;
 }
 
@@ -586,26 +562,24 @@ int server_mkdir(client_args *client){
     char pathBuffer[256];
     bzero(&pathBuffer, sizeof(pathBuffer));
     char *path = (char *)malloc(sizeof(char));
+    strcpy(path, mount);
     
     int recv_path;
     if((recv_path = recv(client->fd, pathBuffer, sizeof(pathBuffer), 0)) == -1)
         perror("Error reading path from the client\n");
     
     path[recv_path] = '\0';
-    strcpy(path, pathBuffer);
+    strcat(path, pathBuffer);
     
     //recv mode
-    int modeN;
-    bzero(&modeN, sizeof(modeN));
+    mode_t modeN;
     
     if(recv(client->fd, &modeN, sizeof(modeN), 0) < 0)
         printf("Error reading mode from the client\n");
-    
-    int mode = ntohl(modeN);
-    
+        
     int result;
     
-    result = mkdir(path, mode);
+    result = mkdir(path, 0777);
     
     int mkdirResult = htonl(result);
     
@@ -624,60 +598,20 @@ int server_mkdir(client_args *client){
 }
 
 int server_getattr(client_args *client){
+    puts("ATTR");
     //recv path
     char pathBuffer[256];
     bzero(&pathBuffer, sizeof(pathBuffer));
-    char *path = (char *)malloc(sizeof(char));
+    char *path = (char *)malloc(256);
+    strcpy(path, mount);
     
     int recv_path;
     if((recv_path = recv(client->fd, pathBuffer, sizeof(pathBuffer), 0)) == -1)
         perror("Error reading path from the client\n");
     
-    path[recv_path] = '\0';
-    strcpy(path, pathBuffer);
-    
-    //recv stbuf
-    char stbufBuffer[512];
-    bzero(&stbufBuffer, sizeof(stbufBuffer));
-    char *serializedStbuf = (char *)malloc(sizeof(char));
-    
-    int recv_stbuf;
-    if((recv_stbuf = recv(client->fd, stbufBuffer, sizeof(stbufBuffer), 0)) == -1)
-        perror("Error reading stbuf from the client\n");
-    
-    path[recv_stbuf] = '\0';
-    strcpy(serializedStbuf, stbufBuffer);
-    
-    char *dev_tVal1 = serializedStbuf;
-    char *ino_tVal = dev_tVal1 + sizeof(dev_tVal1);
-    char *mode_tVal = ino_tVal + sizeof(ino_t);
-    char *nlinkVal = mode_tVal + sizeof(mode_t);
-    char *uid_tVal = nlinkVal + sizeof(nlink_t);
-    char *gid_tVal = uid_tVal + sizeof(uid_t);
-    char *dev_tVal2 = gid_tVal + sizeof(gid_t);
-    char *off_tVal = dev_tVal2 + sizeof(dev_t);
-    char *blksize_tVal = off_tVal + sizeof(off_tVal);
-    char *blkcnt_tVal = blksize_tVal + sizeof(blksize_t);
-    char *time_tVal1 = blkcnt_tVal + sizeof(blkcnt_t);
-    char *time_tVal2 = time_tVal1 + sizeof(time_t);
-    char *time_tVal3 = time_tVal2 + sizeof(time_t);
-    
+    strcat(path, pathBuffer);   
+    printf("!---%s\n", path); 
     struct stat *stbuf = malloc(sizeof(struct stat));
-    
-    stbuf->st_dev = *((int*)dev_tVal1);
-    stbuf->st_ino = *((int*)ino_tVal);
-    stbuf->st_mode = *((int*)mode_tVal);
-    stbuf->st_nlink = *((int*)nlinkVal);
-    stbuf->st_uid = *((int*)uid_tVal);
-    stbuf->st_gid = *((int*)gid_tVal);
-    stbuf->st_rdev = *((int*)dev_tVal2);
-    stbuf->st_size = *((int*)off_tVal);
-    stbuf->st_blksize = *((int*)blksize_tVal);
-    stbuf->st_blocks = *((int*)blkcnt_tVal);
-    stbuf->st_atime = *((int*)time_tVal1);
-    stbuf->st_mtime = *((int*)time_tVal2);
-    stbuf->st_ctime = *((int*)time_tVal3);
-    
     int result = lstat(path, stbuf);
     
     int res = htonl(result);
@@ -692,9 +626,55 @@ int server_getattr(client_args *client){
         if(send(client->fd, &error, sizeof(error), 0) == -1)
             perror("Could not send errno to the client");
     }
-    
+    else if(result == 0)
+    {
+        if(send(client->fd, stbuf, sizeof(struct stat), 0) == -1)
+            perror("Could not send the  stat struct to the client\n");
+    }
+    printf("!!--%d\n",result);
     return result;
 
+}
+
+int server_readdir(client_args *client){
+    puts("READ");
+    char pathBuffer[256];
+
+    bzero(&pathBuffer, sizeof(pathBuffer));
+
+    DIR *dp;
+    struct dirent *de;
+    char *path = (char *)malloc(256);
+    strcpy(path, mount);
+
+    int recv_path;
+    if((recv_path = recv(client->fd, pathBuffer, sizeof(pathBuffer), 0)) == -1)
+        perror("Error reading path from the client\n");
+
+    printf("--%s\n", pathBuffer);
+    
+    strcat(path, pathBuffer);    
+
+    dp = opendir(path);
+    //send error
+
+    while ((de = readdir(dp)) != NULL) {
+        struct stat st;
+        memset(&st, 0, sizeof(st));
+        st.st_ino = de->d_ino;
+        st.st_mode = de->d_type << 12;
+        int y = strlen(de->d_name) + 1; 
+        send(client->fd, &y, sizeof(int), 0);       
+        send(client->fd, de->d_name, y, 0);
+        send(client->fd, &st, sizeof(struct stat), 0);
+    }
+    int x = -1;
+    if(send(client->fd, &x, sizeof(int), 0) == -1)
+        perror("Could not send the buf to the client\n");
+
+    closedir(dp);
+
+    return 0;
 }
 
 int server_opendir(client_args *client){
@@ -709,7 +689,7 @@ int server_opendir(client_args *client){
     directory_name[recv_dir] = '\0';
     strcpy(directory_name, dirnameBuffer);
     
-    DIR *fd
+    int *fd;
     fd = opendir(directory_name);
     if(fd == NULL){   //CHECK IF THIS STUFF IS RIGHT
         perror("Unable to open the requested directory.");
@@ -753,20 +733,22 @@ void* selectMethod(void *arg){
         
     }
     else if(command == 6){ //getattr
-        printf("calling server_getattr");
+        //printf("calling server_getattr");
         server_getattr(args);
     }
     else if(command == 7){ //opendir
         
     }
     else if(command == 8){ //readdir
+        //printf("calling server_readdir");
+        server_readdir(args);
         
     }
     else if(command == 9){ //releasedir
         
     }
     else if(command == 10){ //mkdir
-        printf("calling server_mkdir");
+        puts("calling server_mkdir");
         server_mkdir(args);
     }
 	else{
