@@ -626,28 +626,15 @@ int server_readdir(client_args *client){
     puts("READDIR");
     DIR *dp;
     struct dirent *de;
-    int pathsize;
+    int fd;
     int recv_file;
 
-    if((recv_file = recv(client->fd, &pathsize, sizeof(int), 0)) == -1)
-        perror("Error reading pathsize from the client\n");
+    if((recv_file = recv(client->fd, &fd, sizeof(int), 0)) == -1)
+        perror("Error reading pathsize from the client\n");  
 
-    int pathLen = ntohl(pathsize);
-    int fullLen = pathLen + strlen(mount);
+    int fh = ntohl(fd);
 
-    //recv path
-    char pathBuffer[fullLen];
-    bzero(&pathBuffer, sizeof(pathBuffer));
-    char *path = (char *)malloc(fullLen);
-    strcpy(path, mount);
-    
-    int recv_path;
-    if((recv_path = recv(client->fd, pathBuffer, pathLen, 0)) == -1)
-        perror("Error reading path from the client\n");
-    
-    strcat(path, pathBuffer);    
-
-    dp = opendir(path);
+    dp = fdopendir(fh);
     //send error
     int y;
     int z;
@@ -667,8 +654,6 @@ int server_readdir(client_args *client){
     int x = -1;
     if(send(client->fd, &x, sizeof(int), 0) == -1)
         perror("Could not send the buf to the client\n");
-
-    closedir(dp);
 
     return 0;
 }
@@ -746,6 +731,13 @@ int server_opendir(client_args *client){
     DIR *dir = opendir(path);
     if(dir == NULL){   //CHECK IF THIS STUFF IS RIGHT
         perror("Unable to open the requested directory.");
+
+        int x = htonl(-1);
+        if(send(client->fd, &x, sizeof(x), 0) == -1){
+            perror("Error sending -1 to the client");
+            return -1;
+        }
+
         int error = htonl(errno);
         if(send(client->fd, &error, sizeof(error), 0) == -1){
             printf("Error sending errno to the client");
@@ -759,9 +751,42 @@ int server_opendir(client_args *client){
         int fd = dirfd(dir);
         int fd_send = htonl(fd);
         if(send(client->fd, &fd_send, sizeof(fd), 0) == -1)
+        {
             perror("Error sending fd to the client");
+            return -1;
+        }
     }
     return 0;
+}
+
+int server_releasedir(client_args *client){
+    puts("releasedir");
+    int fds = -1;
+    DIR *dp;
+
+    if(recv(client->fd, &fds, sizeof(fds), 0) == -1)
+        perror("Could not receive fd to release from the client");
+
+    int fd = ntohl(fds);
+    printf("fd going to be released is %d\n", fd);
+
+    dp = fdopendir(fd);
+    int result = closedir(dp);
+    printf("--closeres: %d\n", result);
+    int res = htonl(result);
+
+    //send result
+    if(send(client->fd, &res, sizeof(res) , 0) == -1)
+        perror("Could not send the release return value to the client\n");
+    
+    //send errno if there is an error
+    if(result == -1){
+        int error = htonl(errno);
+        if(send(client->fd, &error, sizeof(error), 0) == -1)
+            perror("Could not send errno to the client");
+    }
+    
+    return result;
 }
 
 int server_create(client_args *client){
@@ -851,12 +876,12 @@ void* selectMethod(void *arg){
         server_opendir(args);
     }
     else if(command == 8){ //readdir
-        //printf("calling server_readdir");
+        printf("calling server_readdir");
         server_readdir(args);
-        
     }
     else if(command == 9){ //releasedir
-        
+        printf("calling server_releasedir");
+        server_releasedir(args);
     }
     else if(command == 10){ //mkdir
         puts("calling server_mkdir");
@@ -871,69 +896,3 @@ void* selectMethod(void *arg){
 	}
 	return NULL;	
 }
-/*
-node* searchListAddress(char *ipAddress){
-	node *ptr = list;
-	node *prv = NULL;
-
-	if(ptr == NULL)return NULL;
-
-	while(ptr != NULL){
-		if(strcmp((ptr->client)->ipAddress, ipAddress) == 0)
-			return ptr;
-		prv = ptr;
-		ptr = ptr->next;
-	}
-	return prv;
-}
-
-int addClientNode(client_args *client){
-	node *doesExist = searchListAddress(client->ipAddress);
-	node *newNode = (node *)malloc(sizeof(node));
-	newNode->client = client;
-	newNode->client->database = NULL;
-	newNode->next = NULL;
-
-	if(doesExist == NULL){
-		list = newNode;
-		return 0;
-	}
-	else if(doesExist->next == NULL && strcmp((doesExist->client)->ipAddress, client->ipAddress) != 0){
-		doesExist->next = newNode;
-		return 0;
-	}
-	else
-		return -1;
-}
-*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
