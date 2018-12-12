@@ -30,7 +30,7 @@ typedef struct{
      0. open
      1. read
      2. write
-     3. close
+     3. flush
      4. create
      5. truncate
      6. getattr
@@ -38,6 +38,7 @@ typedef struct{
      8. readdir
      9. releasedir
      10. mkdir
+     11. release
      */
     int fd;
 //	fileNode *database;
@@ -469,63 +470,58 @@ int server_write(client_args *client){
     
     return res;
 }
-/*
-int server_close(client_args *client){
+
+int server_flush(client_args *client){
 	int fds = -1;
 
 	if(recv(client->fd, &fds, sizeof(fds), 0) == -1)
-		perror("Could not receive fd to close from the client");
+		perror("Could not receive fd to flush from the client");
 
 	int fd = ntohl(fds);
-	printf("fd going to be closed is %d\n", fd);
+	printf("fd going to be flushed is %d\n", fd);
 
-	int closed; //fileExists = 0;
+    int result = close(dup(fd));
+    int res = htonl(result);
 
-	fileNode *searchDatabase = searchDataBaseFD(client, fd);
-	if(searchDatabase == NULL || (searchDatabase->next == NULL && searchDatabase->fd != fd)){
-		int err = htonl(EBADF);
-		int retVal = htonl(-1);
-		if(send(client->fd, &retVal, sizeof(retVal), 0) == -1)
-			perror("Could not send return value to the client\n");
+    //send result
+    if(send(client->fd, &res, sizeof(res) , 0) == -1)
+        perror("Could not send the flush return value to the client\n");
+    
+    //send errno if there is an error
+    if(result == -1){
+        int error = htonl(errno);
+        if(send(client->fd, &error, sizeof(error), 0) == -1)
+            perror("Could not send errno to the client");
+    }
+    
+    return result;
+}
 
-		sleep(1);
+int server_release(client_args *client){
+    int fds = -1;
 
-		if(send(client->fd, &err, sizeof(err), 0) == -1)
-			perror("Could not send errno to the client\n");
+    if(recv(client->fd, &fds, sizeof(fds), 0) == -1)
+        perror("Could not receive fd to release from the client");
 
-		return -1;
-	}
+    int fd = ntohl(fds);
+    printf("fd going to be released is %d\n", fd);
 
-	if(searchDatabase->fd == fd){
-		//fileExists  = 1;
-		pthread_mutex_lock(&mutex);
-		if(numReaders== 0 && isWriting == 0)
-			closed = close(fd);
-		else
-			closed = 0;
-		pthread_mutex_unlock(&mutex);
-	}
-	else{ // file is not in the database
-		closed = -1;
-	}
+    int result = close(fd);
+    int res = htonl(result);
 
-	int closeResult = htonl(closed);
-
-	if(send(client->fd, &closeResult, sizeof(closeResult) , 0) == -1)
-		perror("Could not send the close return value to the client\n");
-
-	if(closed == -1){
-		errno = 9;
-		int error = htonl(errno);
-		if(send(client->fd, &error, sizeof(error), 0) == -1)
-			perror("Could not send errno to the client");
-	}
-	else{
-		removeFileNode(client, fd);
-	}
-
-	return closed;
-}*/
+    //send result
+    if(send(client->fd, &res, sizeof(res) , 0) == -1)
+        perror("Could not send the release return value to the client\n");
+    
+    //send errno if there is an error
+    if(result == -1){
+        int error = htonl(errno);
+        if(send(client->fd, &error, sizeof(error), 0) == -1)
+            perror("Could not send errno to the client");
+    }
+    
+    return result;
+}
 
 int server_mkdir(client_args *client){
     
@@ -726,31 +722,46 @@ int server_truncate(client_args *client){
 }
 
 int server_opendir(client_args *client){
-    char dirnameBuffer[255];
-    bzero(&dirnameBuffer, sizeof(dirnameBuffer));
-    char *directory_name = (char *)malloc(sizeof(char));
+    int pathsize;
+    int recv_file;
+
+    if((recv_file = recv(client->fd, &pathsize, sizeof(int), 0)) == -1)
+        perror("Error reading pathsize from the client\n");
+
+    int pathLen = ntohl(pathsize);
+    int fullLen = pathLen + strlen(mount);
+
+    //recv path
+    char pathBuffer[fullLen];
+    bzero(&pathBuffer, sizeof(pathBuffer));
+    char *path = (char *)malloc(fullLen);
+    strcpy(path, mount);
     
-    int recv_dir;
-    if((recv_dir = recv(client->fd, dirnameBuffer, sizeof(dirnameBuffer), 0)) == -1)
-        perror("Error reading directory name from the client\n");
+    int recv_path;
+    if((recv_path = recv(client->fd, pathBuffer, pathLen, 0)) == -1)
+        perror("Error reading path from the client\n");
     
-    directory_name[recv_dir] = '\0';
-    strcpy(directory_name, dirnameBuffer);
+    strcat(path, pathBuffer);    
     
-    int *fd;
-    fd = opendir(directory_name);
-    if(fd == NULL){   //CHECK IF THIS STUFF IS RIGHT
+    DIR *dir = opendir(path);
+    if(dir == NULL){   //CHECK IF THIS STUFF IS RIGHT
         perror("Unable to open the requested directory.");
         int error = htonl(errno);
         if(send(client->fd, &error, sizeof(error), 0) == -1){
             printf("Error sending errno to the client");
+            return -1;
         }
+
+        return -1;
     }
-    /*
-     if(send(client->fd, &fd, sizeof(fd), 0) == -1)
-     perror("Error sending fd to the client");
-     */
-    return fd;
+    else
+    {
+        int fd = dirfd(dir);
+        int fd_send = htonl(fd);
+        if(send(client->fd, &fd_send, sizeof(fd), 0) == -1)
+            perror("Error sending fd to the client");
+    }
+    return 0;
 }
 
 int server_create(client_args *client){
@@ -819,10 +830,10 @@ void* selectMethod(void *arg){
         printf("calling server_write");
         server_write(args);
     }
-	/*else if(command == 3){
-		printf("calling server_close");
-		server_close(args);
-	}*/
+	else if(command == 3){
+		printf("calling server_flush");
+		server_flush(args);
+	}
     else if(command == 4){ //create
         puts("calling create");
         server_create(args);
@@ -836,7 +847,8 @@ void* selectMethod(void *arg){
         server_getattr(args);
     }
     else if(command == 7){ //opendir
-        
+        puts("calling opendir");
+        server_opendir(args);
     }
     else if(command == 8){ //readdir
         //printf("calling server_readdir");
@@ -849,6 +861,10 @@ void* selectMethod(void *arg){
     else if(command == 10){ //mkdir
         puts("calling server_mkdir");
         server_mkdir(args);
+    }
+    else if(command == 11){ //mkdir
+        puts("calling server_release");
+        server_release(args);
     }
 	else{
 		printf("No valid method was called\n");	

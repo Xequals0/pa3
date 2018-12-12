@@ -29,16 +29,20 @@ int snfs_read(const char *path, char *buf, size_t size, off_t offset, struct fus
 int snfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi);
 int snfs_truncate(const char *path, off_t size);
 int snfs_create(const char *path, mode_t mode, struct fuse_file_info *fi);
+int snfs_opendir(const char *path, struct fuse_file_info *fi);
+int snfs_flush(const char *path, struct fuse_file_info *fi);
+int snfs_release(const char *path, struct fuse_file_info *fi);
 
 static struct fuse_operations snfs_oper = {
     .open = snfs_open,
-    //.close = snfs_close
+    .flush = snfs_flush,
+    .release = snfs_release,
     .create = snfs_create,
     .truncate = snfs_truncate,
     .getattr = snfs_getattr,
     .read = snfs_read,
     .write = snfs_write,
-    /*.opendir = snfs_opendir,*/
+    //.opendir = snfs_opendir,
     .readdir = snfs_readdir,/*
     .releasedir = snfs_releasedir,*/
     .mkdir = snfs_mkdir
@@ -143,45 +147,100 @@ int snfs_open(const char *path, struct fuse_file_info *fi){
     
 	return 0;	
 }
-/*
-int snfs_close(int fd){
 
-	int connection = openConnection();
-	if(connection < 0){
-		h_errno = HOST_NOT_FOUND;
-		return -1;
-	}
+int snfs_flush(const char *path, struct fuse_file_info *fi){
+    puts("flush");
+    (void) path;
 
-	int nClose = htonl(3);
-	if(send(connection, &nClose, sizeof(nClose), 0) == -1){
-		perror("Could not send close command to server\n");
-	}
+    int connection = openConnection();
+    
+    if(connection < 0){
+        h_errno = HOST_NOT_FOUND;
+        return -1;
+    }
+    
+    int command = htonl(3);
+    
+    printf("Sending flush command to the server\n");
+    if(send(connection, &command, sizeof(command), 0) < 0)
+        printf("Error sending flush command to the server\n");
+        
+    //send handle
+    int fh = htonl(fi->fh);
+    int numBytesSent = send(connection, &fh, sizeof(uint64_t), 0);
+    if(numBytesSent < 0)
+        printf("Error sending fh to the server\n");
+    else
+        printf("Success sending fh(%d) to the server\n", fi->fh);
 
-	sleep(1);
+    //recv return value
+    int retVal;
+    if(recv(connection, &retVal, sizeof(retVal), 0) == -1)
+        perror("Return value from the server was not received\n");
+    
+    int result = ntohl(retVal);
+    
+    //receive any errors
+    int errorMessage;
+    if(result == -1){
+        if(recv(connection, &errorMessage, sizeof(errorMessage), 0) == -1){
+            perror("Could not recieve error message from the server\n");
+            return -1;
+        }
+        errno = ntohl(errorMessage);
+        perror("Error from the server\n");
+    }
 
-	int msg = htonl(fd);
-	if(send(connection, &msg, sizeof(msg), 0) == -1)
-		perror("Fd could not be sent to the server\n");
+    close(connection);
+    return result;
+}
 
-	int retVal;
-	if(recv(connection, &retVal, sizeof(retVal), 0) == -1)
-		perror("Return value from the server was not received\n");
+int snfs_release(const char *path, struct fuse_file_info *fi){
+    puts("release");
+    (void) path;
 
-	int result = ntohl(retVal);
-	
-	if(result == -1){
-		int error;
-		if(recv(connection, &error, sizeof(error), 0) == -1)
-			perror("Could not get error code from the server\n");
+    int connection = openConnection();
+    
+    if(connection < 0){
+        h_errno = HOST_NOT_FOUND;
+        return -1;
+    }
+    
+    int command = htonl(11);
+    
+    printf("Sending release command to the server\n");
+    if(send(connection, &command, sizeof(command), 0) < 0)
+        printf("Error sending release command to the server\n");
+        
+    //send handle
+    int fh = htonl(fi->fh);
+    int numBytesSent = send(connection, &fh, sizeof(uint64_t), 0);
+    if(numBytesSent < 0)
+        printf("Error sending fh to the server\n");
+    else
+        printf("Success sending fh(%d) to the server\n", fi->fh);
 
-		errno = ntohl(error);
-		perror("Error when trying to close fd\n");
-	}
-	printf("\n");
-	close(connection);
+    //recv return value
+    int retVal;
+    if(recv(connection, &retVal, sizeof(retVal), 0) == -1)
+        perror("Return value from the server was not received\n");
+    
+    int result = ntohl(retVal);
+    
+    //receive any errors
+    int errorMessage;
+    if(result == -1){
+        if(recv(connection, &errorMessage, sizeof(errorMessage), 0) == -1){
+            perror("Could not recieve error message from the server\n");
+            return -1;
+        }
+        errno = ntohl(errorMessage);
+        perror("Error from the server\n");
+    }
 
-	return result;
-}*/
+    close(connection);
+    return result;
+}
 
 int snfs_truncate(const char *path, off_t size){
     int connection = openConnection();
@@ -311,7 +370,7 @@ int getFlags(char *flags){
 }
 
 int snfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi){
-    (void*) path;
+    (void) path;
     int connection = openConnection();
     
     if(connection < 0){
@@ -374,7 +433,7 @@ int snfs_read(const char *path, char *buf, size_t size, off_t offset, struct fus
 }
 
 int snfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi){
-    (void*) path;
+    (void) path;
     int connection = openConnection();
     
     if(connection < 0){
@@ -438,14 +497,18 @@ int snfs_write(const char *path, const char *buf, size_t size, off_t offset, str
      
     return result;
 }
-/*
-int snfs_opendir(const char *path, struct fuse_file_info *fi){
 
-}*/
+int snfs_opendir(const char *path, struct fuse_file_info *fi){
+    puts("opendir");
+    (void) path;
+    (void) fi;
+
+    return 0;
+}
 
 int snfs_readdir(const char* path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi){
     (void) offset;
-    (void*) fi;
+    (void) fi;
     int connection = openConnection();
     
     if(connection < 0){
