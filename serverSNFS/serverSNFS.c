@@ -268,13 +268,21 @@ fileNode* searchDataBaseFileName(client_args *client, char *filename){
 */
 
 int server_open(client_args *client){
-	char filenameBuffer[256];
-	bzero(&filenameBuffer, sizeof(filenameBuffer));
-	char *filename = (char *)malloc(256);
+    int pathsize;
+    int recv_file;
+
+    if((recv_file = recv(client->fd, &pathsize, sizeof(int), 0)) == -1)
+        perror("Error reading pathsize from the client\n");
+
+    int pathLen = ntohl(pathsize);
+    int fullLen = pathLen + strlen(mount);
+
+    char filenameBuffer[fullLen];
+    bzero(&filenameBuffer, sizeof(filenameBuffer));
+    char *filename = (char *)malloc(fullLen);
     strcpy(filename, mount);
 
-	int recv_file;
-	if((recv_file = recv(client->fd, filenameBuffer, sizeof(filenameBuffer), 0)) == -1)
+	if((recv_file = recv(client->fd, filenameBuffer, pathLen, 0)) == -1)
 		perror("Error reading filename from the client\n");
 
 	/*fileNode* searchDatabase;
@@ -282,7 +290,6 @@ int server_open(client_args *client){
 	int isLast = 0;
 	int fileExists = 0;*/
 
-	filename[recv_file] = '\0';
 	strcat(filename, filenameBuffer);
 
  	/*searchDatabase = searchDataBaseFileName(client, filename);
@@ -523,16 +530,25 @@ int server_close(client_args *client){
 int server_mkdir(client_args *client){
     
     //recv path
-    char pathBuffer[256];
+    int pathsize;
+    int recv_file;
+
+    if((recv_file = recv(client->fd, &pathsize, sizeof(int), 0)) == -1)
+        perror("Error reading pathsize from the client\n");
+
+    int pathLen = ntohl(pathsize);
+    int fullLen = pathLen + strlen(mount);
+
+    //recv path
+    char pathBuffer[fullLen];
     bzero(&pathBuffer, sizeof(pathBuffer));
-    char *path = (char *)malloc(sizeof(char));
+    char *path = (char *)malloc(fullLen);
     strcpy(path, mount);
     
     int recv_path;
-    if((recv_path = recv(client->fd, pathBuffer, sizeof(pathBuffer), 0)) == -1)
+    if((recv_path = recv(client->fd, pathBuffer, pathLen, 0)) == -1)
         perror("Error reading path from the client\n");
     
-    path[recv_path] = '\0';
     strcat(path, pathBuffer);
     
     //recv mode
@@ -543,7 +559,7 @@ int server_mkdir(client_args *client){
         
     int result;
     
-    result = mkdir(path, 0777);
+    result = mkdir(path, modeN);
     
     int mkdirResult = htonl(result);
     
@@ -563,14 +579,24 @@ int server_mkdir(client_args *client){
 
 int server_getattr(client_args *client){
     puts("ATTR");
+
+    int pathsize;
+    int recv_file;
+
+    if((recv_file = recv(client->fd, &pathsize, sizeof(int), 0)) == -1)
+        perror("Error reading pathsize from the client\n");
+
+    int pathLen = ntohl(pathsize);
+    int fullLen = pathLen + strlen(mount);
+
     //recv path
-    char pathBuffer[256];
+    char pathBuffer[fullLen];
     bzero(&pathBuffer, sizeof(pathBuffer));
-    char *path = (char *)malloc(256);
+    char *path = (char *)malloc(fullLen);
     strcpy(path, mount);
     
     int recv_path;
-    if((recv_path = recv(client->fd, pathBuffer, sizeof(pathBuffer), 0)) == -1)
+    if((recv_path = recv(client->fd, pathBuffer, pathLen, 0)) == -1)
         perror("Error reading path from the client\n");
     
     strcat(path, pathBuffer);   
@@ -601,27 +627,34 @@ int server_getattr(client_args *client){
 }
 
 int server_readdir(client_args *client){
-    puts("READ");
-    char pathBuffer[256];
-
-    bzero(&pathBuffer, sizeof(pathBuffer));
-
+    puts("READDIR");
     DIR *dp;
     struct dirent *de;
-    char *path = (char *)malloc(256);
+    int pathsize;
+    int recv_file;
+
+    if((recv_file = recv(client->fd, &pathsize, sizeof(int), 0)) == -1)
+        perror("Error reading pathsize from the client\n");
+
+    int pathLen = ntohl(pathsize);
+    int fullLen = pathLen + strlen(mount);
+
+    //recv path
+    char pathBuffer[fullLen];
+    bzero(&pathBuffer, sizeof(pathBuffer));
+    char *path = (char *)malloc(fullLen);
     strcpy(path, mount);
-
+    
     int recv_path;
-    if((recv_path = recv(client->fd, pathBuffer, sizeof(pathBuffer), 0)) == -1)
+    if((recv_path = recv(client->fd, pathBuffer, pathLen, 0)) == -1)
         perror("Error reading path from the client\n");
-
-    printf("--%s\n", pathBuffer);
     
     strcat(path, pathBuffer);    
 
     dp = opendir(path);
     //send error
-
+    int y;
+    int z;
     while ((de = readdir(dp)) != NULL) {
         struct stat st;
         memset(&st, 0, sizeof(st));
@@ -631,6 +664,9 @@ int server_readdir(client_args *client){
         send(client->fd, &y, sizeof(int), 0);       
         send(client->fd, de->d_name, y, 0);
         send(client->fd, &st, sizeof(struct stat), 0);
+        recv(client->fd, &y, sizeof(int), 0);
+        z = ntohl(y);
+        if(z == -1) break;
     }
     int x = -1;
     if(send(client->fd, &x, sizeof(int), 0) == -1)
@@ -642,16 +678,26 @@ int server_readdir(client_args *client){
 }
 
 int server_truncate(client_args *client){
-    char pathBuffer[256];
+    int pathsize;
+    int recv_file;
+
+    if((recv_file = recv(client->fd, &pathsize, sizeof(int), 0)) == -1)
+        perror("Error reading pathsize from the client\n");
+
+    int pathLen = ntohl(pathsize);
+    int fullLen = pathLen + strlen(mount);
+
+    //recv path
+    char pathBuffer[fullLen];
     bzero(&pathBuffer, sizeof(pathBuffer));
-    char *path = (char *)malloc(256);
+    char *path = (char *)malloc(fullLen);
     strcpy(path, mount);
     
     int recv_path;
-    if((recv_path = recv(client->fd, pathBuffer, sizeof(pathBuffer), 0)) == -1)
+    if((recv_path = recv(client->fd, pathBuffer, pathLen, 0)) == -1)
         perror("Error reading path from the client\n");
     
-    strcat(path, pathBuffer);
+    strcat(path, pathBuffer);   
 
     int sizeN;
     bzero(&sizeN, sizeof(sizeN));
@@ -707,6 +753,55 @@ int server_opendir(client_args *client){
     return fd;
 }
 
+int server_create(client_args *client){
+    puts("create");
+
+    int pathsize;
+    int recv_file;
+
+    if((recv_file = recv(client->fd, &pathsize, sizeof(int), 0)) == -1)
+        perror("Error reading pathsize from the client\n");
+
+    int pathLen = ntohl(pathsize);
+    int fullLen = pathLen + strlen(mount);
+
+    //recv path
+    char pathBuffer[fullLen];
+    bzero(&pathBuffer, sizeof(pathBuffer));
+    char *path = (char *)malloc(fullLen);
+    strcpy(path, mount);
+    
+    int recv_path;
+    if((recv_path = recv(client->fd, pathBuffer, pathLen, 0)) == -1)
+        perror("Error reading path from the client\n");
+    
+    strcat(path, pathBuffer);  
+    printf("!---%s\n", path);
+
+    //recv mode
+    mode_t mode;
+    
+    if(recv(client->fd, &mode, sizeof(mode), 0) < 0)
+        printf("Error reading mode from the client\n");
+
+    printf("mode::: %d\n", mode);
+        
+   int fd = open(path, O_CREAT | O_EXCL | O_WRONLY, mode);
+   int send_fd = htonl(fd);
+
+    if(send(client->fd, &send_fd, sizeof(fd), 0) == -1)
+        perror("Error sending fd to the client");
+
+    if(fd == -1){
+        int error = htonl(errno);
+        if(send(client->fd, &error, sizeof(error), 0) == -1){
+            printf("Error sending errno to the client");
+        }
+    }
+
+    return fd;    
+
+}
 
 void* selectMethod(void *arg){
 	client_args *args = (client_args *)arg;
@@ -729,7 +824,8 @@ void* selectMethod(void *arg){
 		server_close(args);
 	}*/
     else if(command == 4){ //create
-        
+        puts("calling create");
+        server_create(args);
     }
     else if(command == 5){ //truncate
         puts("calling truncate");
