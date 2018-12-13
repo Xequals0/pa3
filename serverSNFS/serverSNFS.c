@@ -86,7 +86,7 @@ int main(int argc, char* argv[])//(int argc, const char* argv[])
             i++;
             mount = (char*)malloc(strlen(argv[i]) + 1);
             strcpy(mount, argv[i]);
-            moungarg = 1;
+            mountarg = 1;
         }
         else if(strcmp(argv[i], "-port") == 0)
         {
