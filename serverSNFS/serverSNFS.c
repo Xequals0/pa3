@@ -76,8 +76,8 @@ char* mount;
 int main(int argc, char* argv[])//(int argc, const char* argv[])
 {
 	//char* port = argv[1];
-    int port = 13175; //This is temporary; We should obtain this from the user.
-
+    int port = -1; //This is temporary; We should obtain this from the user.
+    int mountarg = 0;
     int i;
     for(i = 1; i < argc; i++)
     {
@@ -86,11 +86,20 @@ int main(int argc, char* argv[])//(int argc, const char* argv[])
             i++;
             mount = (char*)malloc(strlen(argv[i]) + 1);
             strcpy(mount, argv[i]);
+            moungarg = 1;
+        }
+        else if(strcmp(argv[i], "-port") == 0)
+        {
+            i++;
+            port = atoi(argv[i]);
         }
     }
 
+    if(mountarg == 0) printf("No mount point specified!\n");
+    if(port == -1) printf("No port number specified!\n");
+    if(mountarg == 0 || port == -1) return -1; 
 
-    	int serverSocket, *clientSocket;
+    int serverSocket, *clientSocket;
 	socklen_t clientlen = sizeof(struct sockaddr_storage);
 	struct sockaddr_storage clientaddr;
 	char client_hostname[8192], client_port[8192];
