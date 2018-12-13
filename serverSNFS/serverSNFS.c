@@ -70,6 +70,8 @@ pthread_mutex_t mutex;
 pthread_cond_t finishedWriting;
 pthread_cond_t finishedReading;
 */
+
+
 char* mount;
 int main(int argc, char* argv[])//(int argc, const char* argv[])
 {
@@ -194,79 +196,6 @@ void* client_thread_handler(void* clientSock)
     pthread_exit(0);
 }
 
-/*
-int removeFileNode(client_args *client, int fd){
-	if(client->database == NULL || client->isEmptyDatabase == 1)
-		return -1;
-
-	//not sure if we need this
-	if(client->database->next == NULL){
-		client->database = NULL;
-		client->isEmptyDatabase = 1;
-		return 0;
-	} 
-
-	fileNode *temp = client->database, *prev;
-	if(temp->fd == fd){
-		client->database = temp->next;
-		free(temp);
-		return 0;
-	}
-
-	int count = 1;
-	while(temp != NULL && (temp->fd != fd)){
-		count++;
-		prev = temp;
-		temp = temp->next;
-	}
-
-	if(temp == NULL){ //reached end of list
-		return -1;
-	}
-
-	prev->next = temp->next;
-
-	free(temp);
-
-	return 0;
-}
-
-fileNode* searchDataBaseFD(client_args *client, int fd){
-	fileNode *ptr = client->database;
-	fileNode *prv = NULL;
-
-	if(ptr == NULL)
-		return NULL;
-
-	while(ptr != NULL){
-		if(ptr->fd == fd)
-			return ptr;
-		prv = ptr;
-		ptr = ptr->next;
-	}
-
-	return prv;
-}
-
-fileNode* searchDataBaseFileName(client_args *client, char *filename){
-	fileNode *ptr = client->database;
-	fileNode *prv = NULL;
-
-	if(client->isEmptyDatabase == 1){
-		client->isEmptyDatabase = 0; // double check this
- 		return NULL;
-	}
-
-	while(ptr != NULL){
-		if(strcmp(ptr->pathname, filename) == 0)
-			return ptr;
-		prv = ptr;
-		ptr = ptr->next;
-	}
-
-	return prv;
-}
-*/
 
 int server_open(client_args *client){
     int pathsize;
@@ -286,27 +215,8 @@ int server_open(client_args *client){
 	if((recv_file = recv(client->fd, filenameBuffer, pathLen, 0)) == -1)
 		perror("Error reading filename from the client\n");
 
-	/*fileNode* searchDatabase;
-	fileNode* newFile = (fileNode *) malloc(sizeof(fileNode));
-	int isLast = 0;
-	int fileExists = 0;*/
-
 	strcat(filename, filenameBuffer);
 
- 	/*searchDatabase = searchDataBaseFileName(client, filename);
-
-	newFile->pathname = filename;
-	
-	printf("filename: %s\n", filename);
-
-	if(searchDatabase != NULL){
-		if(strcmp(searchDatabase->pathname, filename) == 0)
-			fileExists = 1;
-		else if(strcmp(searchDatabase->pathname, filename) != 0 && searchDatabase->next == NULL){
-			isLast = 1;
-		}
-	}
-     */
 	int tmpFlag;
 
 	if(recv(client->fd, &tmpFlag, sizeof(tmpFlag), 0) < 0)
@@ -315,37 +225,11 @@ int server_open(client_args *client){
 	int flag = ntohl(tmpFlag);
 	printf("flag: %d\n", flag);
 
-/*	if(isLast == 1)
-		newFile->flags = flag;
-*/
-
-/*    if(flag == 0)
-        fd = open(filename, O_RDONLY);
-    else if(flag == 1)
-        fd = open(filename, O_WRONLY);
-    else if(flag == 2)
-        fd = open(filename, O_RDWR);
-    else
-        fd = -1;
-
-	printf("fd: %d\n", fd);
-
-	if(fd != -1){
-		newFile->fd = fd;
-		newFile->next = NULL;
-
-		if(client->database == NULL)
-			client->database = newFile;
-
-		if(isLast == 1)
-			searchDatabase->next = newFile;
-	}
-    */
     
     int fd = open(filename, flag);
-    
+    int fdN = htonl(fd);
 
-	if(send(client->fd, &fd, sizeof(fd), 0) == -1)
+	if(send(client->fd, &fdN, sizeof(fdN), 0) == -1)
 		perror("Error sending fd to the client");
 
 
@@ -359,29 +243,67 @@ int server_open(client_args *client){
 	return fd;
 }
 
+int sendall(int socket, const char* buffer, int length)
+{
+   int n;
+   const char *sendptr = buffer;
+   while(length > 0)
+   {
+      n = send(socket, sendptr, length, 0);
+      if(n <= 0) return -1;
+      sendptr += n;
+      length -= n;
+   }
+
+   return 0;
+}
+
+int recvall(int socket, char* buffer, int length)
+{
+   int n;
+   int i = 0;
+   while(length > 0)
+   {
+      n = recv(socket, buffer + i, length, 0);
+      if(n <= 0) return -1;
+      i += n;
+      length -= n;
+   }
+
+   return 0;
+} 
+
 int server_read(client_args *client){
     
     //recv fi
-    uint64_t fh;
+    int fh, fhN;
     int recv_fi;
 
-    if((recv_fi = recv(client->fd, &fh, sizeof(fh), 0)) == -1)
+    if((recv_fi = recv(client->fd, &fhN, sizeof(fh), 0)) == -1)
         perror("Error reading path from the client\n");
-    
+    fh = ntohl(fhN);
+
     //recv size
-    size_t size;
-    
-    if(recv(client->fd, &size, sizeof(size_t), 0) < 0)
+    int size;
+    int sizeN;
+    if(recv(client->fd, &sizeN, sizeof(int), 0) < 0)
         printf("Error reading size from the client\n");
-        
+    size = ntohl(sizeN);        
+
     //recv offset
     off_t offset;
+    int offsetN; 
     
-    if(recv(client->fd, &offset, sizeof(off_t), 0) < 0)
+    if(recv(client->fd, &offsetN, sizeof(int), 0) < 0)
         printf("Error reading offset from the client\n");
-    
+    offset = ntohl(offsetN); 
+	
+    printf("\nsize: %d, offset: %d\n", size, offset);
+
     char *buf = (char*)malloc(size);
     int res = pread(fh, buf, size, offset);
+
+    printf("res: %d\n", res);
     
     if (res == -1){
         int retVal = htonl(-1);
@@ -405,7 +327,7 @@ int server_read(client_args *client){
         perror("Could not send the write return value to the client\n");
 
     //send buffer
-    if(send(client->fd, buf, size , 0) == -1)
+    if(sendall(client->fd, buf, size) == -1)
         perror("Could not send the read value to the client\n");
         
     return res;
@@ -414,11 +336,13 @@ int server_read(client_args *client){
 int server_write(client_args *client){
 
     //receive handle  
-    uint64_t fh;
+    int fh;
+    int fhN;
 
     int recv_fh;
-    if((recv_fh = recv(client->fd, &fh, sizeof(uint64_t), 0)) == -1)
+    if((recv_fh = recv(client->fd, &fhN, sizeof(int), 0)) == -1)
         perror("Error reading path from the client\n");
+    fh = ntohl(fhN);
 
     //recv size
     int sizeN;
@@ -431,7 +355,7 @@ int server_write(client_args *client){
 
     //recv buf
     char *buf = malloc(size);
-    if(recv(client->fd, buf, size, 0) < 0)
+    if(recvall(client->fd, buf, size) < 0)
         printf("Error reading size from the client\n");    
     
     //recv offset
@@ -548,14 +472,17 @@ int server_mkdir(client_args *client){
     strcat(path, pathBuffer);
     
     //recv mode
-    mode_t modeN;
-    
+    int modeN;
+    mode_t mode;
+
     if(recv(client->fd, &modeN, sizeof(modeN), 0) < 0)
         printf("Error reading mode from the client\n");
-        
+         
     int result;
-    
-    result = mkdir(path, modeN);
+
+    mode = ntohl(modeN);
+
+    result = mkdir(path, mode);
     
     int mkdirResult = htonl(result);
     
@@ -636,22 +563,23 @@ int server_readdir(client_args *client){
 
     dp = fdopendir(fh);
     //send error
-    int y;
+    
     int z;
     while ((de = readdir(dp)) != NULL) {
         struct stat st;
         memset(&st, 0, sizeof(st));
         st.st_ino = de->d_ino;
         st.st_mode = de->d_type << 12;
-        int y = strlen(de->d_name) + 1; 
-        send(client->fd, &y, sizeof(int), 0);       
+        int y = strlen(de->d_name) + 1;
+        int yN = htonl(y); 
+        send(client->fd, &yN, sizeof(int), 0);       
         send(client->fd, de->d_name, y, 0);
         send(client->fd, &st, sizeof(struct stat), 0);
         recv(client->fd, &y, sizeof(int), 0);
         z = ntohl(y);
         if(z == -1) break;
     }
-    int x = -1;
+    int x = htonl(-1);
     if(send(client->fd, &x, sizeof(int), 0) == -1)
         perror("Could not send the buf to the client\n");
 
@@ -816,10 +744,12 @@ int server_create(client_args *client){
 
     //recv mode
     mode_t mode;
+    int modeN;
     
-    if(recv(client->fd, &mode, sizeof(mode), 0) < 0)
+    if(recv(client->fd, &modeN, sizeof(modeN), 0) < 0)
         printf("Error reading mode from the client\n");
-
+    
+    mode = ntohl(modeN);
     printf("mode::: %d\n", mode);
         
    int fd = open(path, O_CREAT | O_EXCL | O_WRONLY, mode);
@@ -891,8 +821,9 @@ void* selectMethod(void *arg){
         puts("calling server_release");
         server_release(args);
     }
-	else{
-		printf("No valid method was called\n");	
-	}
-	return NULL;	
+    else{
+        printf("No valid method was called\n");	
+    }
+    
+    return NULL;	
 }

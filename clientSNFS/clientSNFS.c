@@ -49,6 +49,36 @@ static struct fuse_operations snfs_oper = {
     .mkdir = snfs_mkdir
 };
 
+int sendall(int socket, const char* buffer, int length)
+{
+   int n;
+   const char *sendptr = buffer;
+   while(length > 0)
+   {
+      n = send(socket, sendptr, length, 0);
+      if(n <= 0) return -1;
+      sendptr += n;
+      length -= n;
+   }
+
+   return 0;
+}
+
+int recvall(int socket, char* buffer, int length)
+{
+   int n;
+   int i = 0;
+   while(length > 0)
+   {
+      n = recv(socket, buffer + i, length, 0);
+      if(n <= 0) return -1;
+      i += n;
+      length -= n;
+   }
+
+   return 0;
+} 
+
 //int clientSocket;
 int main(int argc, char* argv[])
 {
@@ -124,12 +154,14 @@ int snfs_open(const char *path, struct fuse_file_info *fi){
     
     //recv fd
 	int output_fd;
-	if(recv(connection, &output_fd, sizeof(output_fd), 0) == -1){
+	int out;
+	if(recv(connection, &out, sizeof(out), 0) == -1){
 		perror("Error receiving fd from the server\n");
 		return -1;		
 	}
-
-    fi->fh = output_fd;
+	
+    	output_fd = ntohl(out);
+	fi->fh = output_fd;
 
 	printf("fd recveived was %d\n", output_fd);
 
@@ -168,7 +200,7 @@ int snfs_flush(const char *path, struct fuse_file_info *fi){
         
     //send handle
     int fh = htonl(fi->fh);
-    int numBytesSent = send(connection, &fh, sizeof(uint64_t), 0);
+    int numBytesSent = send(connection, &fh, sizeof(int), 0);
     if(numBytesSent < 0)
         printf("Error sending fh to the server\n");
     else
@@ -215,7 +247,7 @@ int snfs_release(const char *path, struct fuse_file_info *fi){
         
     //send handle
     int fh = htonl(fi->fh);
-    int numBytesSent = send(connection, &fh, sizeof(uint64_t), 0);
+    int numBytesSent = send(connection, &fh, sizeof(int), 0);
     if(numBytesSent < 0)
         printf("Error sending fh to the server\n");
     else
@@ -380,6 +412,8 @@ int snfs_read(const char *path, char *buf, size_t size, off_t offset, struct fus
     }
     
     int command = htonl(1);
+
+    printf("size: %d\n", size);
     
     printf("Sending read command to the server\n");
     if(send(connection, &command, sizeof(command), 0) < 0)
@@ -387,7 +421,8 @@ int snfs_read(const char *path, char *buf, size_t size, off_t offset, struct fus
         
     //send fi
     printf("!-!-%d\n", fi->fh);
-    int numBytesSent = send(connection, &(fi->fh), sizeof(uint64_t), 0);
+    int fh = htonl(fi->fh);
+    int numBytesSent = send(connection, &fh, sizeof(int), 0);
     if(numBytesSent < 0)
         printf("Error sending path to the server\n");
     else
@@ -395,12 +430,14 @@ int snfs_read(const char *path, char *buf, size_t size, off_t offset, struct fus
         
     //send size    
     printf("Sending size to the server\n");
-    if(send(connection, &size, sizeof(size_t), 0) < 0)
+    int sizeN = htonl(size);
+    if(send(connection, &sizeN, sizeof(int), 0) < 0)
         printf("Error sending size to the server\n");
         
     //send offset    
     printf("Sending offset to the server\n");
-    if(send(connection, &offset, sizeof(off_t), 0) < 0)
+    int offN = htonl(offset);
+    if(send(connection, &offN, sizeof(int), 0) < 0)
         printf("Error sending offset to the server\n");
         
     //recv return value
@@ -422,10 +459,12 @@ int snfs_read(const char *path, char *buf, size_t size, off_t offset, struct fus
     }
     else
     {
-        if(recv(connection, buf, size, 0) == -1){
+        if(recvall(connection, buf, size) == -1){
             perror("Could not recieve buf from the server\n");
             return -1;
         }
+
+	printf("buf: %s\n", buf);
     }
     printf("\n");
     close(connection);
@@ -449,7 +488,8 @@ int snfs_write(const char *path, const char *buf, size_t size, off_t offset, str
         printf("Error sending write command to the server\n");
         
     //send handle
-    int numBytesSent = send(connection, &(fi->fh), sizeof(uint64_t), 0);
+    int fh = htonl(fi->fh);
+    int numBytesSent = send(connection, &fh, sizeof(int), 0);
     if(numBytesSent < 0)
         printf("Error sending buf to the server\n");
     else
@@ -463,7 +503,7 @@ int snfs_write(const char *path, const char *buf, size_t size, off_t offset, str
         printf("Error sending size to the server\n");
     
     //send buf
-    numBytesSent = send(connection, buf, size, 0);
+    numBytesSent = sendall(connection, buf, size);
     if(numBytesSent < 0)
         printf("Error sending buf to the server\n");
     else
@@ -510,7 +550,7 @@ int snfs_opendir(const char *path, struct fuse_file_info *fi){
     
     int command = htonl(7);
     
-    printf("Sending read command to the server\n");
+    printf("Sending opendir command to the server\n");
     if(send(connection, &command, sizeof(command), 0) < 0)
         printf("Error sending read command to the server\n");
     
@@ -578,17 +618,19 @@ int snfs_readdir(const char* path, void *buf, fuse_fill_dir_t filler, off_t offs
     else
         printf("Success sending fh(%d) to the server\n", fi->fh);
 
-    int x;
+    int x, xN;
     int y;
     int z;
     while(1)
     {
-        recv(connection, &x, sizeof(int), 0);
+        recv(connection, &xN, sizeof(int), 0);
+        x = ntohl(xN);
+
         if(x == -1) break;
 
         struct stat st;
         memset(&st, 0, sizeof(st));
-        char dname[256];
+        char *dname = (char*)malloc(x);
         recv(connection, dname, x, 0);
         recv(connection, &st, sizeof(struct stat), 0);
         if(filler(buf, dname, &st, 0)){
@@ -602,9 +644,10 @@ int snfs_readdir(const char* path, void *buf, fuse_fill_dir_t filler, off_t offs
             y = 0;
             z = htonl(y);            
             send(connection, &z, sizeof(int), 0);
-        } 
+        }
+	free(dname); 
     }
-
+	
     if(x != -1) recv(connection, &x, sizeof(int), 0);
     close(connection);
 
@@ -692,8 +735,8 @@ int snfs_create(const char *path, mode_t mode, struct fuse_file_info *fi){
 
     //send mode to server
     printf("mode::: %d\n", mode);
-
-    numBytesSent = send(connection, &mode, sizeof(mode), 0);
+    int modeN = htonl(mode);
+    numBytesSent = send(connection, &modeN, sizeof(modeN), 0);
     if(numBytesSent < 0){
         printf("Error sending modeN to the server\n");
         return -1;
@@ -753,8 +796,8 @@ int snfs_mkdir(const char *path, mode_t mode){
         printf("Error sending path to the server\n");
     
     //send mode to server
-
-    numBytesSent = send(connection, &mode, sizeof(mode), 0);
+    int modeN = htonl(mode);
+    numBytesSent = send(connection, &modeN, sizeof(modeN), 0);
     if(numBytesSent < 0)
         printf("Error sending modeN to the server\n");
         
