@@ -187,6 +187,7 @@ int snfs_open(const char *path, struct fuse_file_info *fi){
 		}
 		errno = ntohl(errorMessage);
 		perror("Error from the server\n");
+        return -errno;
 	}
 	printf("\n");
 	close(connection);
@@ -235,6 +236,7 @@ int snfs_flush(const char *path, struct fuse_file_info *fi){
         }
         errno = ntohl(errorMessage);
         perror("Error from the server\n");
+        return -errno;
     }
 
     close(connection);
@@ -278,7 +280,7 @@ int snfs_release(const char *path, struct fuse_file_info *fi){
     if(result == -1){
         if(recv(connection, &errorMessage, sizeof(errorMessage), 0) == -1){
             perror("Could not recieve error message from the server\n");
-            return -1;
+            return -errno;
         }
         errno = ntohl(errorMessage);
         perror("Error from the server\n");
@@ -469,6 +471,7 @@ int snfs_read(const char *path, char *buf, size_t size, off_t offset, struct fus
         }
         errno = ntohl(errorMessage);
         perror("Error from the server\n");
+        return -errno;
     }
     else
     {
@@ -545,6 +548,7 @@ int snfs_write(const char *path, const char *buf, size_t size, off_t offset, str
         }
         errno = ntohl(errorMessage);
         perror("Error from the server\n");
+        return -errno;
     }
     printf("\n");
     close(connection);
@@ -600,7 +604,7 @@ int snfs_opendir(const char *path, struct fuse_file_info *fi){
         }
         errno = ntohl(errorMessage);
         perror("Error from the server\n");
-        return -1;
+        return -errno;
     }
     printf("\n");
     close(connection);
@@ -708,6 +712,7 @@ int snfs_releasedir(const char *path, struct fuse_file_info *fi){
         }
         errno = ntohl(errorMessage);
         perror("Error from the server\n");
+        return -errno;
     }
 
     close(connection);
@@ -773,7 +778,7 @@ int snfs_create(const char *path, mode_t mode, struct fuse_file_info *fi){
         }
         errno = ntohl(errorMessage);
         perror("Error from the server\n");
-        return -1;
+        return -errno;
     }
     printf("\n");
     close(connection);
@@ -830,6 +835,7 @@ int snfs_mkdir(const char *path, mode_t mode){
         }
         errno = ntohl(errorMessage);
         perror("Error from the server\n");
+        return -errno;
     }
     printf("\n");
     close(connection);
@@ -852,7 +858,7 @@ int openConnection(){
 
     serv_addr.sin_family = AF_INET;
     server = gethostbyname(address); //Update this later
-    if (server < 0) { //Not sure if I did this right?
+    if (server == NULL) { //Not sure if I did this right?
         printf("Failed to resolve the host. Error: %d\n",errno);
         exit(1);
     }
