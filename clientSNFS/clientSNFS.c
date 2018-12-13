@@ -34,6 +34,10 @@ int snfs_flush(const char *path, struct fuse_file_info *fi);
 int snfs_release(const char *path, struct fuse_file_info *fi);
 int snfs_releasedir(const char *path, struct fuse_file_info *fi);
 
+int portNum;
+char *address;
+
+
 static struct fuse_operations snfs_oper = {
     .open = snfs_open,
     .flush = snfs_flush,
@@ -82,9 +86,13 @@ int recvall(int socket, char* buffer, int length)
 //int clientSocket;
 int main(int argc, char* argv[])
 {
+    int argc2 = 2;
+    char* argv2[2];
+    argv2[0] = argv[0];
+
     int i;
     char* port;
-    char* address;
+    //char* addressString;
     char* mount;
     
     for(i = 1; i < argc; i++)
@@ -92,25 +100,30 @@ int main(int argc, char* argv[])
         if(strcmp(argv[i], "-port") == 0)
         {
             i++;
-            port = (char*)malloc(strlen(argv[i]) + 1);
+           /* port = (char*)malloc(strlen(argv[i]) + 1);
             strcpy(port, argv[i]);
+            char *ptr; */
+            portNum  = atoi(argv[i]);//strtol(port, &ptr, 10);
+           // printf("port: %d\n", portNum);
         }
         else if(strcmp(argv[i], "-address") == 0)
         {
             i++;
             address = (char*)malloc(strlen(argv[i]) + 1);
             strcpy(address, argv[i]);
-            
+            //address = addressString; 
+           //printf("address: %s\n", address);
         }
         else if(strcmp(argv[i], "-mount") == 0)
         {
             i++;
             mount = (char*)malloc(strlen(argv[i]) + 1);
             strcpy(mount, argv[i]);
+            argv2[1] = mount;
         }
     }
     
-    return fuse_main(argc, argv, &snfs_oper, NULL);
+    return fuse_main(argc2, argv2, &snfs_oper, NULL);
 }
 
 int snfs_open(const char *path, struct fuse_file_info *fi){
@@ -825,7 +838,7 @@ int snfs_mkdir(const char *path, mode_t mode){
 }
 
 int openConnection(){
-    int port = 13175;
+    int port = portNum;
     
     int clientSocket;
     struct sockaddr_in serv_addr;
@@ -838,8 +851,8 @@ int openConnection(){
     }
 
     serv_addr.sin_family = AF_INET;
-    server = gethostbyname("ls.cs.rutgers.edu"); //Update this later
-    if (server == 0) { //Not sure if I did this right?
+    server = gethostbyname(address); //Update this later
+    if (server < 0) { //Not sure if I did this right?
         printf("Failed to resolve the host. Error: %d\n",errno);
         exit(1);
     }
